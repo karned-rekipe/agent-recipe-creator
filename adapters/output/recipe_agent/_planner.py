@@ -1,22 +1,33 @@
-from adapters.output.recipe_agent._logger import log as logger
-from domain.models.recipe import RecipePlan
-from infrastructure.config import LMSettings
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIModelProfile
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
+from adapters.output.recipe_agent._logger import log as logger
+from domain.models.recipe import RecipePlan
+from infrastructure.config import LMSettings
+
 _SYSTEM_PROMPT = (
     "Tu es un assistant d'extraction culinaire. "
     "À partir d'une description en langage naturel, tu structures une recette complète. "
-    "Extrais le nombre de portions (servings) et les temps de préparation/cuisson si mentionnés. "
+    "\n\n"
+    "## Nom de la recette\n"
+    "Détermine un nom court, canonique et normalisé (ex. 'Tarte Tatin', 'Pizza Margherita', 'Soupe à l'oignon'). "
+    "Ne préfixe jamais avec 'Recette de' ou 'La recette'. "
+    "Ce nom sera utilisé pour rechercher si la recette existe déjà — sois précis et cohérent.\n\n"
+    "## Ingrédients\n"
     "Identifie tous les ingrédients avec leur quantité et leur unité si mentionnées. "
-    "Identifie tous les ustensiles nécessaires. "
+    "Normalise les noms (ex. 'farine de blé', 'sel fin') sans majuscule inutile.\n\n"
+    "## Ustensiles\n"
+    "Identifie tous les ustensiles nécessaires à la réalisation. "
+    "Normalise les noms (ex. 'fouet', 'casserole 20 cm').\n\n"
+    "## Étapes\n"
     "Décompose la recette en étapes ordonnées : donne un titre court et une instruction complète à chaque étape, "
     "ainsi que la durée estimée en minutes si elle est précisée ou déductible. "
-    "Dans chaque étape, utilise uniquement des ingrédients et ustensiles présents dans les listes. "
-    "Déduis un nom de recette si non explicitement donné. "
+    "Dans chaque étape, utilise uniquement des ingrédients et ustensiles présents dans les listes.\n\n"
+    "## Métadonnées\n"
+    "Extrais le nombre de portions (servings) et les temps de préparation/cuisson si mentionnés.\n\n"
     "Réponds toujours en français."
 )
 

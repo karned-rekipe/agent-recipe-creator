@@ -1,8 +1,10 @@
-from typing import Annotated, TypedDict
+from typing import Annotated
 
-from domain.models.recipe import RecipePlan
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
+
+from domain.models.recipe import RecipePlan
 
 
 class RecipeAgentState(TypedDict):
@@ -11,4 +13,5 @@ class RecipeAgentState(TypedDict):
     resolved_ingredients: dict[str, str]  # name → uuid
     resolved_ustensils: dict[str, str]  # name → uuid
     recipe_uuid: str | None
+    recipe_exists: bool | None
     error: str | None
