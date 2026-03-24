@@ -1,10 +1,11 @@
 from datetime import datetime
+from uuid import UUID as StdUUID
 
 from pydantic import BaseModel, Field
 
 
 class AgentRunSchema(BaseModel):
-    uuid: str = Field(description = "UUID du run")
+    uuid: StdUUID = Field(description = "UUID du run")
     status: str = Field(description = "Statut : pending | running | success | failed | cancelled")
     raw_input: str = Field(description = "Texte soumis à l'agent")
     recipe_uuid: str | None = Field(default = None, description = "UUID de la recette créée")

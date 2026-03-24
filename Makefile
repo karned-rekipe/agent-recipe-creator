@@ -7,16 +7,16 @@ setup:
 	git config core.hooksPath .githooks
 
 lint:
-	$(UV) ruff check $(SRC)
+	$(UV) ruff check .
 
 typecheck:
-	$(UV) mypy $(SRC)
+	$(UV) mypy .
 
 security:
 	$(UV) bandit -r $(SRC) -ll
 
 complexity:
-	@output=$$($(UV) radon cc $(SRC) --min C -s); \
+	@output=$$($(UV) radon cc . --min C -s); \
 	if [ -n "$$output" ]; then echo "$$output"; exit 1; fi
 
 test:
@@ -30,7 +30,7 @@ test-e2e:
 
 coverage:
 	$(UV) pytest \
-		--cov=domain --cov=adapters --cov=application --cov=infrastructure \
+		--cov=. \
 		--cov-report=term-missing --cov-report=html --cov-branch \
 		--cov-fail-under=80
 

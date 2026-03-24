@@ -12,6 +12,7 @@ from domain.models.recipe import RecipePlan
 def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
     async def plan_node(state: RecipeAgentState) -> dict:
         user_message = state["messages"][-1].content
+        assert isinstance(user_message, str)
         logger.info(f"▶ [plan] length={len(user_message)} content={user_message[:200]!r}")
         t0 = time.perf_counter()
 
@@ -32,6 +33,7 @@ def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
 def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def check_recipe_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [check_recipe] name={plan.name!r}")
         t0 = time.perf_counter()
 
@@ -57,6 +59,7 @@ def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> C
 def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ingredients_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [resolve_ingredients] {len(plan.ingredients)} ingredient(s)")
         t0 = time.perf_counter()
         resolved: dict[str, str] = {}
@@ -82,6 +85,7 @@ def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callabl
 def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ustensils_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [resolve_ustensils] {len(plan.ustensils)} ustensil(s)")
         t0 = time.perf_counter()
         resolved: dict[str, str] = {}
@@ -107,6 +111,7 @@ def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable)
 def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_recipe_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [create_recipe] name={plan.name!r}")
         t0 = time.perf_counter()
 
@@ -122,6 +127,7 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
 def make_link_ingredients_node(registry: _MCPRecipeRegistry) -> Callable:
     async def link_ingredients_node(state: RecipeAgentState) -> dict:
         recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
         resolved = state["resolved_ingredients"]
         logger.info(f"▶ [link_ingredients] {len(resolved)} ingredient(s) → recipe {recipe_uuid}")
         t0 = time.perf_counter()
@@ -143,6 +149,7 @@ def make_link_ingredients_node(registry: _MCPRecipeRegistry) -> Callable:
 def make_link_ustensils_node(registry: _MCPRecipeRegistry) -> Callable:
     async def link_ustensils_node(state: RecipeAgentState) -> dict:
         recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
         resolved = state["resolved_ustensils"]
         logger.info(f"▶ [link_ustensils] {len(resolved)} ustensil(s) → recipe {recipe_uuid}")
         t0 = time.perf_counter()
@@ -164,7 +171,9 @@ def make_link_ustensils_node(registry: _MCPRecipeRegistry) -> Callable:
 def make_create_steps_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_steps_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
         logger.info(f"▶ [create_steps] {len(plan.steps)} step(s) → recipe {recipe_uuid}")
         t0 = time.perf_counter()
 
@@ -181,14 +190,7 @@ def make_create_steps_node(registry: _MCPRecipeRegistry) -> Callable:
     return create_steps_node
 
 
-def _format_response(
-        plan: RecipePlan, uuid: str, resolved_ingredients: dict, resolved_ustensils: dict
-) -> str:
-    lines: list[str] = [f"✅ **{plan.name}** créée avec succès — 🆔 `{uuid}`"]
-
-    if plan.description:
-        lines.append(f"\n_{plan.description}_")
-
+def _format_plan_meta(plan: RecipePlan) -> list[str]:
     meta: list[str] = []
     if plan.servings:
         meta.append(f"👥 {plan.servings}")
@@ -196,66 +198,83 @@ def _format_response(
         meta.append(f"⏱ Prépa : {plan.prep_time_minutes} min")
     if plan.cook_time_minutes:
         meta.append(f"🔥 Cuisson : {plan.cook_time_minutes} min")
+    return meta
+
+
+def _format_plan_ingredients(plan: RecipePlan) -> list[str]:
+    lines: list[str] = []
+    if not plan.ingredients:
+        return lines
+    lines.append("\n## 🥕 Ingrédients")
+    for ing in plan.ingredients:
+        parts = [p for p in (ing.quantity, ing.unit) if p]
+        prefix = " ".join(parts)
+        lines.append(f"- {'**' + prefix + '**  ' if prefix else ''}{ing.name}")
+    return lines
+
+
+def _format_plan_steps(plan: RecipePlan) -> list[str]:
+    lines: list[str] = []
+    if not plan.steps:
+        return lines
+    lines.append("\n## 📋 Étapes")
+    for i, step in enumerate(plan.steps, 1):
+        duration = f" _{step.duration_minutes} min_" if step.duration_minutes else ""
+        lines.append(f"\n**{i}. {step.title}**{duration}")
+        lines.append(step.instruction)
+    return lines
+
+
+def _format_response(
+        plan: RecipePlan, uuid: str, resolved_ingredients: dict, resolved_ustensils: dict
+) -> str:
+    lines: list[str] = [f"✅ **{plan.name}** créée avec succès — 🆔 `{uuid}`"]
+    if plan.description:
+        lines.append(f"\n_{plan.description}_")
+    meta = _format_plan_meta(plan)
     if meta:
         lines.append("  •  ".join(meta))
-
-    if plan.ingredients:
-        lines.append("\n## 🥕 Ingrédients")
-        for ing in plan.ingredients:
-            parts = []
-            if ing.quantity:
-                parts.append(ing.quantity)
-            if ing.unit:
-                parts.append(ing.unit)
-            prefix = " ".join(parts)
-            lines.append(f"- {'**' + prefix + '**  ' if prefix else ''}{ing.name}")
-
+    lines.extend(_format_plan_ingredients(plan))
     if plan.ustensils:
         lines.append("\n## 🍳 Ustensiles")
-        for ust in plan.ustensils:
-            lines.append(f"- {ust.name}")
-
-    if plan.steps:
-        lines.append("\n## 📋 Étapes")
-        for i, step in enumerate(plan.steps, 1):
-            duration = f" _{step.duration_minutes} min_" if step.duration_minutes else ""
-            lines.append(f"\n**{i}. {step.title}**{duration}")
-            lines.append(step.instruction)
-
+        lines.extend(f"- {ust.name}" for ust in plan.ustensils)
+    lines.extend(_format_plan_steps(plan))
     return "\n".join(lines)
+
+
+def _format_existing_ingredients(ingredients: list[dict]) -> list[str]:
+    lines: list[str] = []
+    if not ingredients:
+        return lines
+    lines.append("\n## 🥕 Ingrédients")
+    for ing in ingredients:
+        unit = f" ({ing['unit']})" if ing.get("unit") else ""
+        lines.append(f"- {ing['name']}{unit}")
+    return lines
+
+
+def _format_existing_steps(steps: list[dict]) -> list[str]:
+    lines: list[str] = []
+    if not steps:
+        return lines
+    lines.append("\n## 📋 Étapes")
+    for i, step in enumerate(steps, 1):
+        lines.append(f"\n**{i}. {step['name']}**")
+        if step.get("description"):
+            lines.append(step["description"])
+    return lines
 
 
 def _format_response_existing(recipe: dict) -> str:
     lines: list[str] = [f"ℹ️ **{recipe['name']}** existe déjà — 🆔 `{recipe['uuid']}`"]
-
     if recipe.get("description"):
         lines.append(f"\n_{recipe['description']}_")
-
-    meta: list[str] = []
     if recipe.get("nutriscore"):
-        meta.append(f"🏷 Nutriscore : {recipe['nutriscore']}")
-    if meta:
-        lines.append("  •  ".join(meta))
-
-    ingredients = recipe.get("ingredients") or []
-    if ingredients:
-        lines.append("\n## 🥕 Ingrédients")
-        for ing in ingredients:
-            unit = f" ({ing['unit']})" if ing.get("unit") else ""
-            lines.append(f"- {ing['name']}{unit}")
-
+        lines.append(f"🏷 Nutriscore : {recipe['nutriscore']}")
+    lines.extend(_format_existing_ingredients(recipe.get("ingredients") or []))
     ustensils = recipe.get("ustensils") or []
     if ustensils:
         lines.append("\n## 🍳 Ustensiles")
-        for ust in ustensils:
-            lines.append(f"- {ust['name']}")
-
-    steps = recipe.get("steps") or []
-    if steps:
-        lines.append("\n## 📋 Étapes")
-        for i, step in enumerate(steps, 1):
-            lines.append(f"\n**{i}. {step['name']}**")
-            if step.get("description"):
-                lines.append(step["description"])
-
+        lines.extend(f"- {ust['name']}" for ust in ustensils)
+    lines.extend(_format_existing_steps(recipe.get("steps") or []))
     return "\n".join(lines)

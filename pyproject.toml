@@ -8,8 +8,8 @@ version = "0.1.0"
 description = "Agent IA de création de recettes — built on arclith"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "arclith[mongodb,fastapi,mcp]==0.2.0",
-    "pydantic-ai[anthropic]>=1.69.0",
+    "arclith[mongodb,fastapi,mcp,duckdb]>=0.2.0",
+    "pydantic-ai>=0.4.0",
     "langgraph>=0.4.0",
     "langchain-mcp-adapters>=0.1.0",
     "rapidfuzz>=3.0",
@@ -19,6 +19,17 @@ dependencies = [
 
 [tool.mypy]
 explicit_package_bases = true
+
+[tool.coverage.run]
+omit = [
+    "main_*.py",
+    "__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "if __name__ == .__main__.:",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -39,4 +50,7 @@ dev = [
     "pytest-cov==7.0.0",
     "ruff==0.15.6",
     "mypy==1.19.1",
+    "bandit==1.8.3",
+    "radon>=6.0",
+    "types-pyyaml>=6.0",
 ]
