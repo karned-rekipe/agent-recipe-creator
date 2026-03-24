@@ -1,11 +1,9 @@
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import typer
-from typer.testing import CliRunner
 
-from adapters.input.cli.recipe_cli import _run_create, app
+from adapters.input.cli.recipe_cli import _run_create
 from domain.models.recipe import RecipeResult
 
 _RESULT = RecipeResult(
