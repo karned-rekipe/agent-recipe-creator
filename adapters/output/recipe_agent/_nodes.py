@@ -12,6 +12,7 @@ from domain.models.recipe import RecipePlan
 def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
     async def plan_node(state: RecipeAgentState) -> dict:
         user_message = state["messages"][-1].content
+        assert isinstance(user_message, str)
         logger.info(f"▶ [plan] length={len(user_message)} content={user_message[:200]!r}")
         t0 = time.perf_counter()
 
@@ -32,6 +33,7 @@ def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
 def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def check_recipe_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [check_recipe] name={plan.name!r}")
         t0 = time.perf_counter()
 
@@ -57,6 +59,7 @@ def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> C
 def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ingredients_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [resolve_ingredients] {len(plan.ingredients)} ingredient(s)")
         t0 = time.perf_counter()
         resolved: dict[str, str] = {}
@@ -82,6 +85,7 @@ def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callabl
 def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ustensils_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [resolve_ustensils] {len(plan.ustensils)} ustensil(s)")
         t0 = time.perf_counter()
         resolved: dict[str, str] = {}
@@ -107,6 +111,7 @@ def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable)
 def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_recipe_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         logger.info(f"▶ [create_recipe] name={plan.name!r}")
         t0 = time.perf_counter()
 
@@ -122,6 +127,7 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
 def make_link_ingredients_node(registry: _MCPRecipeRegistry) -> Callable:
     async def link_ingredients_node(state: RecipeAgentState) -> dict:
         recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
         resolved = state["resolved_ingredients"]
         logger.info(f"▶ [link_ingredients] {len(resolved)} ingredient(s) → recipe {recipe_uuid}")
         t0 = time.perf_counter()
@@ -143,6 +149,7 @@ def make_link_ingredients_node(registry: _MCPRecipeRegistry) -> Callable:
 def make_link_ustensils_node(registry: _MCPRecipeRegistry) -> Callable:
     async def link_ustensils_node(state: RecipeAgentState) -> dict:
         recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
         resolved = state["resolved_ustensils"]
         logger.info(f"▶ [link_ustensils] {len(resolved)} ustensil(s) → recipe {recipe_uuid}")
         t0 = time.perf_counter()
@@ -164,7 +171,9 @@ def make_link_ustensils_node(registry: _MCPRecipeRegistry) -> Callable:
 def make_create_steps_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_steps_node(state: RecipeAgentState) -> dict:
         plan = state["plan"]
+        assert plan is not None
         recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
         logger.info(f"▶ [create_steps] {len(plan.steps)} step(s) → recipe {recipe_uuid}")
         t0 = time.perf_counter()
 

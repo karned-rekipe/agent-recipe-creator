@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.sessions import StreamableHttpConnection
 
 from adapters.output.recipe_agent._logger import log as logger
 
@@ -10,7 +11,7 @@ from adapters.output.recipe_agent._logger import log as logger
 class _MCPRecipeRegistry:
     def __init__(self, url: str) -> None:
         self._client = MultiServerMCPClient(
-            {"rekipe": {"url": url, "transport": "http"}}
+            {"rekipe": StreamableHttpConnection(url=url, transport="streamable_http")}
         )
 
     async def _call(self, tool_name: str, args: dict) -> Any:
