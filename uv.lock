@@ -132,17 +132,19 @@ wheels = [
 
 [[package]]
 name = "arclith"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "fastapi" },
+    { name = "fastmcp" },
     { name = "loguru" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "uuid6" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ba/59/4fb332ae6f9cb4139fca5c80d3767114bed28027f584a67aa7908730a3fc/arclith-0.2.0.tar.gz", hash = "sha256:01e23953d1286543dcd06c04d31ef9dcbf888983328e9eec07e3c7d7f828b8c3", size = 76359, upload-time = "2026-03-18T00:19:11.616Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/17/dcfecbef6eb70c6b94e6c6d0e63c689627dfb85f5bc9c303f6fedd1cb0dd/arclith-0.3.0.tar.gz", hash = "sha256:f86adfb6d361597e7811b2dc1b555f4334d47d184c7ab4628bbbd4d3070728b7", size = 121803, upload-time = "2026-03-25T08:26:03.743Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d1/b9/3b07169d2002b341a84a5261390405b007f88422a808b6cf1c82a1e77ed9/arclith-0.2.0-py3-none-any.whl", hash = "sha256:f612e1e7b1320635574ec2378e0c1a4dca88f3796a471f8a6bd65981e65de2d1", size = 33488, upload-time = "2026-03-18T00:19:10.183Z" },
+    { url = "https://files.pythonhosted.org/packages/94/47/0c9ea82cae50643fb4a5ac058d0d2276c1711151d3307777be1995fc6e04/arclith-0.3.0-py3-none-any.whl", hash = "sha256:c762cdb4344006dd489bb2ea768620a499692a7a19a00707b5e9e8c8b08220b0", size = 39449, upload-time = "2026-03-25T08:26:02.412Z" },
 ]
 
 [package.optional-dependencies]
@@ -159,6 +161,9 @@ mcp = [
 ]
 mongodb = [
     { name = "motor" },
+]
+vault = [
+    { name = "hvac" },
 ]
 
 [[package]]
@@ -871,6 +876,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/19/15/eafc1c57bf0f8afffb243dcd4c0cceb785e956acc17bba4d9bf2ae21fc9c/huggingface_hub-1.7.2.tar.gz", hash = "sha256:7f7e294e9bbb822e025bdb2ada025fa4344d978175a7f78e824d86e35f7ab43b", size = 724684, upload-time = "2026-03-20T10:36:08.767Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/08/de/3ad061a05f74728927ded48c90b73521b9a9328c85d841bdefb30e01fb85/huggingface_hub-1.7.2-py3-none-any.whl", hash = "sha256:288f33a0a17b2a73a1359e2a5fd28d1becb2c121748c6173ab8643fb342c850e", size = 618036, upload-time = "2026-03-20T10:36:06.824Z" },
+]
+
+[[package]]
+name = "hvac"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/a4/c0b698a7250b7a5c2956427406560701862215c646e079a7907846608f44/hvac-2.3.0.tar.gz", hash = "sha256:1b85e3320e8642dd82f234db63253cda169a817589e823713dc5fca83119b1e2", size = 332660, upload-time = "2024-06-18T14:46:09.748Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/34/56facf52e2ea14ce640f434ccf00311af6f3a1df0019d4682ba28ea09948/hvac-2.3.0-py3-none-any.whl", hash = "sha256:a3afc5710760b6ee9b3571769df87a0333da45da05a5f9f963e1d3925a84be7d", size = 155860, upload-time = "2024-06-18T14:46:05.399Z" },
 ]
 
 [[package]]
@@ -2109,11 +2126,11 @@ wheels = [
 
 [[package]]
 name = "pytz"
-version = "2026.1.post1"
+version = "2024.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/56/db/b8721d71d945e6a8ac63c0fc900b2067181dbb50805958d4d4661cf7d277/pytz-2026.1.post1.tar.gz", hash = "sha256:3378dde6a0c3d26719182142c56e60c7f9af7e968076f31aae569d72a0358ee1", size = 321088, upload-time = "2026-03-03T07:47:50.683Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/26/9f1f00a5d021fff16dee3de13d43e5e978f3d58928e129c3a62cf7eb9738/pytz-2024.1.tar.gz", hash = "sha256:2a29735ea9c18baf14b448846bde5a48030ed267578472d8955cd0e7443a9812", size = 316214, upload-time = "2024-02-02T01:18:41.693Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/10/99/781fe0c827be2742bcc775efefccb3b048a3a9c6ce9aec0cbf4a101677e5/pytz-2026.1.post1-py2.py3-none-any.whl", hash = "sha256:f2fd16142fda348286a75e1a524be810bb05d444e5a081f37f7affc635035f7a", size = 510489, upload-time = "2026-03-03T07:47:49.167Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/3d/a121f284241f08268b21359bd425f7d4825cffc5ac5cd0e1b3d82ffd2b10/pytz-2024.1-py2.py3-none-any.whl", hash = "sha256:328171f4e3623139da4983451950b28e95ac706e13f3f2630a879749e7a8b319", size = 505474, upload-time = "2024-02-02T01:18:37.283Z" },
 ]
 
 [[package]]
@@ -2254,14 +2271,13 @@ name = "rekipe-agent-recipe-creator"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "arclith", extra = ["duckdb", "fastapi", "mcp", "mongodb"] },
+    { name = "arclith", extra = ["duckdb", "fastapi", "mcp", "mongodb", "vault"] },
     { name = "langchain-mcp-adapters" },
     { name = "langgraph" },
     { name = "loguru" },
     { name = "pydantic-ai" },
     { name = "rapidfuzz" },
     { name = "typer" },
-    { name = "uuid6" },
 ]
 
 [package.dev-dependencies]
@@ -2278,14 +2294,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "arclith", extras = ["mongodb", "fastapi", "mcp", "duckdb"], specifier = ">=0.2.0" },
+    { name = "arclith", extras = ["mongodb", "fastapi", "mcp", "duckdb", "vault"], specifier = ">=0.3.0" },
     { name = "langchain-mcp-adapters", specifier = ">=0.1.0" },
     { name = "langgraph", specifier = ">=0.4.0" },
     { name = "loguru", specifier = ">=0.7" },
     { name = "pydantic-ai", specifier = ">=0.4.0" },
     { name = "rapidfuzz", specifier = ">=3.0" },
     { name = "typer", specifier = ">=0.15.0" },
-    { name = "uuid6", specifier = ">=2025.0.1" },
 ]
 
 [package.metadata.requires-dev]
