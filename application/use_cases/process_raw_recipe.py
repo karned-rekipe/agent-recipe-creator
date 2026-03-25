@@ -4,7 +4,7 @@ from arclith.domain.ports.logger import Logger
 from arclith.domain.ports.repository import Repository
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.ports.output.recipe_agent import RecipeAgentPort
 
 
 class ProcessRawRecipeUseCase:

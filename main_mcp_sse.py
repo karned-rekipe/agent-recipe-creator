@@ -1,8 +1,7 @@
 from pathlib import Path
 
+from adapters.input.fastmcp.register import register_tools
 from arclith import Arclith
-
-from adapters.input.fastmcp.tools import register_tools
 from infrastructure.logging_setup import setup_logging
 
 _logger = setup_logging()

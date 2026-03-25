@@ -1,11 +1,12 @@
 from pathlib import Path
 
-from adapters.input.fastapi.agent_run_router import AgentRunRouter
-from adapters.input.fastapi.recipe_router import RecipeRouter
-from arclith import Arclith
 from fastapi import FastAPI
+
+from adapters.input.fastapi.routers.agent_run_router import AgentRunRouter
+from adapters.input.fastapi.routers.recipe_router import RecipeRouter
+from arclith import Arclith
 from infrastructure.config import load_agent_config
-from infrastructure.container import build_container
+from infrastructure.containers.container import build_container
 
 
 def register_routers(app: FastAPI, arclith: Arclith) -> None:

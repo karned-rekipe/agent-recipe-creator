@@ -1,14 +1,14 @@
 import pytest
 from fastapi import HTTPException
 
-from adapters.input.fastapi.recipe_router import RecipeRouter
+from adapters.input.fastapi.routers.recipe_router import RecipeRouter
 from adapters.input.schemas.recipe_schema import AiCreateRequestSchema
 from application.services.recipe_service import RecipeService
 from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.ports.output.recipe_agent import RecipeAgentPort
 from tests.units.conftest import NullLogger
 
 

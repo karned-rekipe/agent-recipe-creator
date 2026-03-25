@@ -1,8 +1,7 @@
+import pytest
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from infrastructure.container import build_container
+from infrastructure.containers.container import build_container
 
 
 def _mock_arclith(mongo=True):

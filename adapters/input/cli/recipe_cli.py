@@ -1,10 +1,11 @@
-import asyncio
 from pathlib import Path
 
+import asyncio
 import typer
+
 from arclith import Arclith
 from infrastructure.config import load_agent_config
-from infrastructure.container import build_container
+from infrastructure.containers.container import build_container
 
 app = typer.Typer(name = "recipe-agent", help = "Agent de création de recettes par IA")
 

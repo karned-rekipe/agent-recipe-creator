@@ -4,7 +4,7 @@ from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.ports.output.recipe_agent import RecipeAgentPort
 from tests.units.conftest import NullLogger
 
 

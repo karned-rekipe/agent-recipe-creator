@@ -1,10 +1,10 @@
+from fastapi import APIRouter, HTTPException
 from uuid import UUID as StdUUID
+from uuid6 import UUID
 
 from adapters.input.schemas.agent_run_schema import AgentRunSchema
 from application.services.agent_run_service import AgentRunService
 from arclith.domain.ports.logger import Logger
-from fastapi import APIRouter, HTTPException
-from uuid6 import UUID
 
 
 class AgentRunRouter:
@@ -15,8 +15,23 @@ class AgentRunRouter:
         self._register_routes()
 
     def _register_routes(self) -> None:
-        self.router.add_api_route("/", self.list_runs, methods = ["GET"], response_model = list[AgentRunSchema])
-        self.router.add_api_route("/{uuid}", self.get_run, methods = ["GET"], response_model = AgentRunSchema)
+        self.router.add_api_route(
+            methods = ["GET"],
+            path = "/",
+            endpoint = self.list_runs,
+            summary = "List agent runs",
+            response_model = list[AgentRunSchema],
+            response_description = "List of all agent runs",
+        )
+        self.router.add_api_route(
+            methods = ["GET"],
+            path = "/{uuid}",
+            endpoint = self.get_run,
+            summary = "Get agent run",
+            response_model = AgentRunSchema,
+            response_description = "The agent run",
+            responses = {404: {"description": "Agent run not found"}},
+        )
 
     async def list_runs(self) -> list[AgentRunSchema]:
         """List all agent runs."""

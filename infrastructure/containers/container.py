@@ -1,4 +1,4 @@
-from adapters.output.mongodb.agent_run_repository import MongoDBAgentRunRepository
+from adapters.output.mongodb.repository import MongoDBAgentRunRepository
 from adapters.output.recipe_agent.agent_adapter import RecipeAgentAdapter
 from application.services.agent_run_service import AgentRunService
 from application.services.recipe_service import RecipeService

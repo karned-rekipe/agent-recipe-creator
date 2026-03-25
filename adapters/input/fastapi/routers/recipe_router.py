@@ -1,7 +1,8 @@
+from fastapi import APIRouter, HTTPException
+
 from adapters.input.schemas.recipe_schema import AiCreateRequestSchema, AiCreateResponseSchema
 from application.services.recipe_service import RecipeService
 from arclith.domain.ports.logger import Logger
-from fastapi import APIRouter, HTTPException
 
 
 class RecipeRouter:
@@ -13,10 +14,12 @@ class RecipeRouter:
 
     def _register_routes(self) -> None:
         self.router.add_api_route(
-            "/ai-create",
-            self.ai_create,
             methods = ["POST"],
+            path = "/ai-create",
+            endpoint = self.ai_create,
+            summary = "AI-create recipe",
             response_model = AiCreateResponseSchema,
+            response_description = "Recipe creation result with UUID and formatted output",
             status_code = 201,
         )
 

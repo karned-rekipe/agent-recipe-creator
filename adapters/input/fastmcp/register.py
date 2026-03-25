@@ -1,10 +1,11 @@
 from pathlib import Path
 
 import fastmcp
-from adapters.input.fastmcp.recipe_tools import RecipeMCP
+
+from adapters.input.fastmcp.tools.recipe_tools import RecipeMCP
 from arclith import Arclith
 from infrastructure.config import load_agent_config
-from infrastructure.container import build_container
+from infrastructure.containers.container import build_container
 
 
 def register_tools(mcp: fastmcp.FastMCP, arclith: Arclith) -> None:

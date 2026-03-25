@@ -1,9 +1,8 @@
-import uuid as _uuid
-
 import pytest
+import uuid as _uuid
 from fastapi import HTTPException
 
-from adapters.input.fastapi.agent_run_router import AgentRunRouter
+from adapters.input.fastapi.routers.agent_run_router import AgentRunRouter
 from application.services.agent_run_service import AgentRunService
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun

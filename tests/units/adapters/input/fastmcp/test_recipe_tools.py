@@ -1,10 +1,9 @@
-from unittest.mock import AsyncMock, MagicMock
-
 import fastmcp
 import pytest
 from fastmcp.exceptions import ToolError
+from unittest.mock import AsyncMock, MagicMock
 
-from adapters.input.fastmcp.recipe_tools import RecipeMCP
+from adapters.input.fastmcp.tools.recipe_tools import RecipeMCP
 from domain.models.recipe import RecipeResult
 
 

@@ -1,10 +1,10 @@
+import fastmcp
+from pydantic import Field
 from typing import Annotated
 
-import fastmcp
 from adapters.input.schemas.recipe_schema import AiCreateResponseSchema
 from application.services.recipe_service import RecipeService
 from arclith.domain.ports.logger import Logger
-from pydantic import Field
 
 
 class RecipeMCP:

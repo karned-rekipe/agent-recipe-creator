@@ -1,7 +1,7 @@
 from pathlib import Path
 
+from adapters.input.fastapi.register import register_routers
 from arclith import Arclith
-from adapters.input.fastapi.router import register_routers
 
 arclith = Arclith(Path(__file__).parent / "config.yaml")
 app = arclith.fastapi()

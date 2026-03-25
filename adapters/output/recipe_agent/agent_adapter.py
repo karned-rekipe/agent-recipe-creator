@@ -16,7 +16,7 @@ from adapters.output.recipe_agent._nodes import (
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
 from adapters.output.recipe_agent._state import RecipeAgentState
 from domain.models.recipe import RecipeResult
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.ports.output.recipe_agent import RecipeAgentPort
 from infrastructure.config import AgentConfig
 
 
@@ -25,7 +25,7 @@ def _route_check_recipe(state: RecipeAgentState) -> str:
 
 
 def _build_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry, matcher):
-    g = StateGraph(RecipeAgentState)
+    g = StateGraph(RecipeAgentState)  # type: ignore[type-var]
 
     g.add_node("plan", make_plan_node(planner))
     g.add_node("check_recipe", make_check_recipe_node(registry, matcher))
@@ -66,7 +66,7 @@ class RecipeAgentAdapter(RecipeAgentPort):
             "recipe_exists": None,
             "error": None,
         }
-        result = await self._graph.ainvoke(initial_state)
+        result = await self._graph.ainvoke(initial_state)  # type: ignore[arg-type]
         last_message = result["messages"][-1]
         return RecipeResult(
             recipe_uuid = result["recipe_uuid"],
