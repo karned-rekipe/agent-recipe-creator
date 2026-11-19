@@ -180,6 +180,8 @@ def load_agent_config(
     # files that do not declare one (and may chain Vault with a local fallback).
     if "secrets" not in data:
         data = _deep_merge(data, _load_secret_resolver_config(config_path, secret_config_path))
+    else:
+        data["secrets"] = _normalize_secret_config(data["secrets"], config_path.parent)
     secret_data = _load_yaml(secrets_path or config_path.with_name("secrets.yaml"))
     data = _expand_env(_deep_merge(data, secret_data))
     data = _resolve_config_secrets(data)

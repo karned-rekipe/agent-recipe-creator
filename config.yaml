@@ -8,7 +8,7 @@ adapters:
 secrets:
   resolver: vault
   mappings:
-    lm.planner.api_key: rekipe/sample/lm
+    lm.planner.api_key: rekipe/agent-recipe-creator/anthropic
   vault:
     addr: http://127.0.0.1:5991
     mount: kv

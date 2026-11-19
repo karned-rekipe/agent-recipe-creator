@@ -1,6 +1,8 @@
 from langchain_core.messages import HumanMessage
 
 from adapters.output.recipe_agent._nodes import (
+    _parse_positive_float,
+    _unit_from_quantity,
     _format_response,
     _format_response_existing,
     make_check_recipe_node,
@@ -254,7 +256,7 @@ async def test_resolve_ingredients_empty_plan():
     assert result["resolved_ingredients"] == {}
 
 
-async def test_resolve_ingredients_skips_parent_total_when_components_exist():
+async def test_resolve_ingredients_keeps_parent_total_when_components_exist():
     registry = FakeRegistry()
     node = make_resolve_ingredients_node(registry, _no_match)
     state = _base_state(
@@ -264,8 +266,8 @@ async def test_resolve_ingredients_skips_parent_total_when_components_exist():
         )
     )
     result = await node(state)
-    assert result["resolved_ingredients"] == {}
-    assert registry.created_ingredients == []
+    assert result["resolved_ingredients"] == {"lait": "ing-lait"}
+    assert [item["name"] for item in registry.created_ingredients] == ["lait"]
 
 
 # ── create_components node ─────────────────────────────────────────────────────
@@ -338,6 +340,19 @@ async def test_resolve_ustensils_empty_plan():
     assert result["resolved_ustensils"] == {}
 
 
+async def test_resolve_ustensils_keeps_parent_equipment_when_components_exist():
+    registry = FakeRegistry()
+    node = make_resolve_ustensils_node(registry, _no_match)
+    state = _base_state(
+        plan = _make_plan(
+            ustensils = [UstensilLine(name = "fouet")],
+            components = [RecipeComponentPlan(name = "Crème anglaise")],
+        )
+    )
+    result = await node(state)
+    assert result["resolved_ustensils"] == {"fouet": "ust-fouet"}
+
+
 # ── create_recipe node ─────────────────────────────────────────────────────────
 
 
@@ -353,6 +368,11 @@ async def test_create_recipe_stores_uuid():
     assert registry.created_recipes[0]["ingredients"] == []
 
 
+def test_parse_mixed_fraction_and_its_unit():
+    assert _parse_positive_float("1 1/2 tasse") == 1.5
+    assert _unit_from_quantity("1 1/2 tasse") == "tasse"
+
+
 async def test_create_recipe_includes_resolved_components():
     registry = FakeRegistry()
     node = make_create_recipe_node(registry)
@@ -363,12 +383,15 @@ async def test_create_recipe_includes_resolved_components():
     )
     state = _base_state(
         plan = plan,
+        resolved_ingredients = {"lait": "ing-lait"},
         resolved_components = [{"recipe_uuid": "child-1", "label": "Crème anglaise", "rank": 1, "servings_multiplier": 1}],
     )
     await node(state)
 
     assert registry.created_recipes[0]["components"][0]["recipe_uuid"] == "child-1"
-    assert registry.created_recipes[0]["ingredients"] == []
+    assert registry.created_recipes[0]["ingredients"] == [{
+        "ingredient_uuid": "ing-lait", "quantity": 1.0, "unit": "unité"
+    }]
 
 
 async def test_create_recipe_without_description():

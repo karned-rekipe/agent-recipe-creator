@@ -229,6 +229,29 @@ def test_load_agent_config_keeps_explicit_resolver(tmp_path: Path):
     assert config.lm.planner.api_key == "sk-ant-explicit"
 
 
+def test_load_agent_config_normalizes_relative_explicit_resolver_path(tmp_path: Path):
+    config_file = tmp_path / "config.yaml"
+    fallback_file = tmp_path / "secrets.yaml"
+    config_file.write_text(yaml.dump({
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {"planner": {
+            "provider": "anthropic",
+            "model_name": "claude-haiku-4-5-20251001",
+            "api_key": "${ANTHROPIC_API_KEY}",
+        }},
+        "secrets": {
+            "resolver": "yaml",
+            "mappings": {"lm.planner.api_key": "rekipe/agent-recipe-creator/anthropic"},
+            "yaml": {"path": "secrets.yaml"},
+        },
+    }))
+    fallback_file.write_text(yaml.dump({"lm": {"planner": {"api_key": "sk-ant-relative"}}}))
+
+    config = load_agent_config(config_file, secrets_path=tmp_path / "missing-secrets.yaml")
+
+    assert config.lm.planner.api_key == "sk-ant-relative"
+
+
 def test_load_agent_config_keeps_env_value_when_secret_mapping_is_missing(
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,

@@ -176,7 +176,7 @@ def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callabl
         assert plan is not None
         logger.info(f"▶ [resolve_ingredients] {len(plan.ingredients)} ingredient(s)")
         t0 = time.perf_counter()
-        resolved = {} if plan.components else await _resolve_ingredients_for_plan(plan, registry, matcher)
+        resolved = await _resolve_ingredients_for_plan(plan, registry, matcher)
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"◀ [resolve_ingredients] {len(resolved)} resolved in {elapsed_ms:.0f}ms")
@@ -191,7 +191,7 @@ def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable)
         assert plan is not None
         logger.info(f"▶ [resolve_ustensils] {len(plan.ustensils)} ustensil(s)")
         t0 = time.perf_counter()
-        resolved = {} if plan.components else await _resolve_ustensils_for_plan(plan, registry, matcher)
+        resolved = await _resolve_ustensils_for_plan(plan, registry, matcher)
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(f"◀ [resolve_ustensils] {len(resolved)} resolved in {elapsed_ms:.0f}ms")
@@ -212,7 +212,7 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
             state["resolved_ingredients"],
             state["resolved_ustensils"],
             components=state["resolved_components"],
-            include_ingredients=not bool(plan.components),
+            include_ingredients=True,
         )
         created = await registry.create_recipe(payload)
 
@@ -278,6 +278,13 @@ def _parse_positive_float(value: str | None, default: float = 1.0) -> float:
     raw = value.strip().lower().replace(",", ".")
     if not raw:
         return default
+    mixed_fraction = re.search(r"(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", raw)
+    if mixed_fraction:
+        whole = float(mixed_fraction.group(1))
+        numerator = float(mixed_fraction.group(2))
+        denominator = float(mixed_fraction.group(3))
+        if denominator:
+            return max(whole + numerator / denominator, 0.01)
     fraction = re.search(r"(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", raw)
     if fraction:
         numerator = float(fraction.group(1))
@@ -301,7 +308,11 @@ def _unit_from_quantity(quantity: str | None) -> str | None:
     if not quantity:
         return None
     raw = quantity.strip().lower().replace(",", ".")
-    without_number = re.sub(r"^\s*(\d+(?:\.\d+)?\s*/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?|\w+)\s*", "", raw)
+    without_number = re.sub(
+        r"^\s*(?:\d+(?:\.\d+)?\s+)?(?:\d+(?:\.\d+)?\s*/\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?|\w+)\s*",
+        "",
+        raw,
+    )
     without_number = without_number.strip(" .-")
     return without_number or None
 
