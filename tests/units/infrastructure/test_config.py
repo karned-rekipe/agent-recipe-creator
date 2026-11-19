@@ -132,3 +132,48 @@ def test_load_agent_config_anthropic_provider(tmp_path: Path):
     config = load_agent_config(config_file)
     assert config.lm.planner.provider == "anthropic"
     assert config.lm.planner.api_key == "sk-ant-test"
+
+
+def test_load_agent_config_expands_env_api_key(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-from-env")
+    config_file = tmp_path / "config.yaml"
+    config_data = {
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {
+            "planner": {
+                "provider": "anthropic",
+                "model_name": "claude-haiku-4-5",
+                "api_key": "${ANTHROPIC_API_KEY}",
+            }
+        },
+    }
+    config_file.write_text(yaml.dump(config_data))
+    config = load_agent_config(config_file)
+    assert config.lm.planner.api_key == "sk-ant-from-env"
+
+
+def test_load_agent_config_resolves_api_key_from_secret_resolver(tmp_path: Path):
+    config_file = tmp_path / "config.yaml"
+    secrets_file = tmp_path / "secrets.yaml"
+    config_data = {
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {
+            "planner": {
+                "provider": "anthropic",
+                "model_name": "claude-haiku-4-5",
+                "api_key": "${ANTHROPIC_API_KEY}",
+            }
+        },
+        "secrets": {
+            "resolver": "yaml",
+            "mappings": {"lm.planner.api_key": "rekipe/sample/lm"},
+            "yaml": {"path": str(secrets_file)},
+        },
+    }
+    secrets_file.write_text(
+        yaml.dump({"lm": {"planner": {"api_key": "sk-ant-from-secret"}}}),
+        encoding="utf-8",
+    )
+    config_file.write_text(yaml.dump(config_data), encoding="utf-8")
+    config = load_agent_config(config_file)
+    assert config.lm.planner.api_key == "sk-ant-from-secret"

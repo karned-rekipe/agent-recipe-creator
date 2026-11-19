@@ -5,6 +5,13 @@ adapters:
   mongodb:
     uri: mongodb://localhost:5971
     db_name: agent-recipe-creator
+secrets:
+  resolver: vault
+  mappings:
+    lm.planner.api_key: rekipe/sample/lm
+  vault:
+    addr: http://127.0.0.1:5991
+    mount: kv
 api:
   host: 0.0.0.0
   port: 8006
