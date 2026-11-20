@@ -8,7 +8,7 @@ adapters:
 secrets:
   resolver: vault
   mappings:
-    lm.planner.api_key: rekipe/agent-recipe-creator/anthropic
+    lm.planner.api_key: rekipe/agent-recipe-creator/openai
   vault:
     addr: http://127.0.0.1:5991
     mount: kv
@@ -29,9 +29,9 @@ recipe_api:
   tenant_uri: foyer-demo
 lm:
   planner:
-    provider: anthropic
-    model_name: claude-haiku-4-5-20251001
-    api_key: ${ANTHROPIC_API_KEY}
+    provider: openai
+    model_name: gpt-5.4-mini
+    api_key: ${OPENAI_API_KEY}
     # Pour un LLM local (LM Studio / Ollama) :
     # provider: openai
     # model_name: qwen/qwen3.5-9b:2

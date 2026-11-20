@@ -35,9 +35,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Configuration Anthropic
+### Configuration OpenAI
 
-Le modèle configuré par défaut est Anthropic :
+Le modèle configuré par défaut est OpenAI :
 
 ```yaml
 recipe_api:
@@ -46,9 +46,9 @@ recipe_api:
 
 lm:
   planner:
-    provider: anthropic
-    model_name: claude-haiku-4-5-20251001
-    api_key: ${ANTHROPIC_API_KEY}
+    provider: openai
+    model_name: gpt-5.4-mini
+    api_key: ${OPENAI_API_KEY}
 ```
 
 La résolution des secrets est configurée dans `config/secrets.yaml` :
@@ -57,23 +57,23 @@ La résolution des secrets est configurée dans `config/secrets.yaml` :
 resolver: chain
 chain: [vault, yaml]
 mappings:
-  lm.planner.api_key: rekipe/agent-recipe-creator/anthropic
+  lm.planner.api_key: rekipe/agent-recipe-creator/openai
 ```
 
-Option recommandée : stocker la clé dans Vault, au chemin `kv/rekipe/agent-recipe-creator/anthropic`, champ `value`.
+Option recommandée : stocker la clé dans Vault, au chemin `kv/rekipe/agent-recipe-creator/openai`, champ `value`.
 
 ```bash
 export VAULT_ADDR="http://127.0.0.1:5991"
 export VAULT_TOKEN="<token-vault>"
 
-vault kv put kv/rekipe/agent-recipe-creator/anthropic \
-  value="sk-ant-..."
+vault kv put kv/rekipe/agent-recipe-creator/openai \
+  value="<cle-openai>"
 ```
 
 Fallback local possible pour le développement :
 
 ```bash
-cd /Users/killian/Karned/projets/Rekipe/agent-recipe-creator
+cd ./agent-recipe-creator
 cp secrets.yaml.template secrets.yaml
 ```
 
@@ -82,16 +82,16 @@ Puis renseigner dans `secrets.yaml` :
 ```yaml
 lm:
   planner:
-    api_key: sk-ant-...
+    api_key: <cle-openai>
 ```
 
 Option shell :
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="<cle-openai>"
 ```
 
-`secrets.yaml` est ignoré par Git. `ANTHROPIC_API_KEY` reste accepté si Vault et le fallback YAML ne sont pas disponibles.
+`secrets.yaml` est ignoré par Git. `OPENAI_API_KEY` reste accepté si Vault et le fallback YAML ne sont pas disponibles.
 
 ### 1. API REST (FastAPI)
 
