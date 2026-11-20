@@ -81,21 +81,29 @@ docker build --no-cache -t agent-recipe-creator .
 # Raccourci local pour le montage config
 CONFIG="-v $(pwd)/_configs/agent-recipe-creator/config.yaml:/app/config.yaml:ro"
 
+# Si config.yaml référence ${OPENAI_API_KEY}, la variable exportée sur l'hôte
+# doit être transmise explicitement à Docker avec -e OPENAI_API_KEY.
+export OPENAI_API_KEY="<cle-openai>"
+
 # REST API  (port défini dans config.yaml → api.port)
-docker run --rm $CONFIG -p 8006:8006 agent-recipe-creator
+docker run --rm $CONFIG -e OPENAI_API_KEY -p 8006:8006 agent-recipe-creator
 
 # CLI interactif
-docker run --rm -it $CONFIG agent-recipe-creator python main_cli.py
+docker run --rm -it $CONFIG -e OPENAI_API_KEY agent-recipe-creator python main_cli.py
 
 # MCP SSE  (port défini dans config.yaml → mcp.port)
-docker run --rm $CONFIG -p 8004:8004 agent-recipe-creator python main_mcp_sse.py
+docker run --rm $CONFIG -e OPENAI_API_KEY -p 8004:8004 agent-recipe-creator python main_mcp_sse.py
 
 # MCP Streamable HTTP
-docker run --rm $CONFIG -p 8004:8004 agent-recipe-creator python main_mcp_http.py
+docker run --rm $CONFIG -e OPENAI_API_KEY -p 8004:8004 agent-recipe-creator python main_mcp_http.py
 
 # MCP stdio
-docker run --rm -i $CONFIG agent-recipe-creator python main_mcp_stdio.py
+docker run --rm -i $CONFIG -e OPENAI_API_KEY agent-recipe-creator python main_mcp_stdio.py
 ```
+
+On peut aussi remplacer `-e OPENAI_API_KEY` par
+`--env-file _configs/agent-recipe-creator/agent.env` avec un fichier non
+versionné contenant `OPENAI_API_KEY=...`.
 
 ---
 
