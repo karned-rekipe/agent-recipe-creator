@@ -28,10 +28,8 @@ htmlcov/
 # Fichiers non nécessaires au runtime
 docs/
 data/
-config.yaml
 *.md
 Makefile
 LICENSE
 .gitignore
 .python-version
-

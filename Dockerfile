@@ -31,6 +31,8 @@ COPY --chown=app:app domain/        domain/
 COPY --chown=app:app application/   application/
 COPY --chown=app:app adapters/      adapters/
 COPY --chown=app:app infrastructure/ infrastructure/
+COPY --chown=app:app config/        config/
+COPY --chown=app:app config.yaml ./
 COPY --chown=app:app main_api.py \
                      main_cli.py \
                      main_mcp_sse.py \
@@ -45,3 +47,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 USER app
+
+EXPOSE 8004 8006
+
+CMD ["python", "main_api.py"]

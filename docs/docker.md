@@ -22,7 +22,10 @@ uv est toujours utilisé, mais uniquement pour lire le lockfile :
 `uv sync` tente de résoudre l'arborescence du projet (workspace, chemins relatifs) ce qui échoue en environnement isolé.
 `uv export` court-circuite cette résolution et garantit la même reproductibilité que le lockfile.
 
-Le `config.yaml` n'est **jamais** intégré à l'image. Il est monté en lecture seule au démarrage du conteneur.
+L'image embarque la configuration de développement comme valeur de repli afin
+de rester exécutable. En preproduction et en production, `config.yaml` est
+remplacé par un ConfigMap monté en lecture seule ; les secrets sont injectés
+séparément par l'environnement.
 
 > **Prérequis :** le service `recipe` doit être démarré et accessible à l'URL configurée dans `mcp_registry.url`.
 
@@ -41,30 +44,31 @@ _configs/
 **Remplir obligatoirement dans `_configs/agent-recipe-creator/config.yaml`
 ou fournir via Vault / variable d'environnement :**
 
-- `lm.planner.api_key` — clé Anthropic (résolue par Vault via `config/secrets.yaml`, ou credentials du LLM local)
+- `lm.planner.api_key` — clé OpenAI (résolue par Vault via
+  `config/secrets.yaml` ou injectée dans `OPENAI_API_KEY`)
 - `mcp_registry.url` — URL MCP du service `recipe` joignable depuis le conteneur
 - `recipe_api.url` — URL HTTP du service `recipe` joignable depuis le conteneur
 
-Chemin Vault attendu pour Anthropic :
+Chemin Vault attendu pour OpenAI :
 
 ```bash
-vault kv put kv/rekipe/agent-recipe-creator/anthropic value="sk-ant-..."
+vault kv put kv/rekipe/agent-recipe-creator/openai value="<cle-openai>"
 ```
 
 ---
 
 ## Build
 
-> Depuis la racine des repos (`…/Rekipe/` contenant `recipe/`, `agent-recipe-creator/`, `_configs/`)
+> Depuis le dépôt `agent-recipe-creator`.
 
 ```bash
-docker build -t killiankopp/agent-recipe-creator agent-recipe-creator/
+docker build -t agent-recipe-creator .
 ```
 
 Rebuild propre après changement de dépendances (`pyproject.toml` / `uv.lock`) :
 
 ```bash
-docker build --no-cache -t killiankopp/agent-recipe-creator agent-recipe-creator/
+docker build --no-cache -t agent-recipe-creator .
 ```
 
 ---
@@ -77,21 +81,29 @@ docker build --no-cache -t killiankopp/agent-recipe-creator agent-recipe-creator
 # Raccourci local pour le montage config
 CONFIG="-v $(pwd)/_configs/agent-recipe-creator/config.yaml:/app/config.yaml:ro"
 
+# Si config.yaml référence ${OPENAI_API_KEY}, la variable exportée sur l'hôte
+# doit être transmise explicitement à Docker avec -e OPENAI_API_KEY.
+export OPENAI_API_KEY="<cle-openai>"
+
 # REST API  (port défini dans config.yaml → api.port)
-docker run --rm $CONFIG -p 8006:8006 killiankopp/agent-recipe-creator python main_api.py
+docker run --rm $CONFIG -e OPENAI_API_KEY -p 8006:8006 agent-recipe-creator
 
 # CLI interactif
-docker run --rm -it $CONFIG killiankopp/agent-recipe-creator python main_cli.py
+docker run --rm -it $CONFIG -e OPENAI_API_KEY agent-recipe-creator python main_cli.py
 
 # MCP SSE  (port défini dans config.yaml → mcp.port)
-docker run --rm $CONFIG -p 8004:8004 killiankopp/agent-recipe-creator python main_mcp_sse.py
+docker run --rm $CONFIG -e OPENAI_API_KEY -p 8004:8004 agent-recipe-creator python main_mcp_sse.py
 
 # MCP Streamable HTTP
-docker run --rm $CONFIG -p 8004:8004 killiankopp/agent-recipe-creator python main_mcp_http.py
+docker run --rm $CONFIG -e OPENAI_API_KEY -p 8004:8004 agent-recipe-creator python main_mcp_http.py
 
 # MCP stdio
-docker run --rm -i $CONFIG killiankopp/agent-recipe-creator python main_mcp_stdio.py
+docker run --rm -i $CONFIG -e OPENAI_API_KEY agent-recipe-creator python main_mcp_stdio.py
 ```
+
+On peut aussi remplacer `-e OPENAI_API_KEY` par
+`--env-file _configs/agent-recipe-creator/agent.env` avec un fichier non
+versionné contenant `OPENAI_API_KEY=...`.
 
 ---
 
@@ -110,7 +122,7 @@ docker secret create agent-config _configs/agent-recipe-creator/config.yaml
 docker run --rm \
   --mount type=secret,id=agent-config,target=/app/config.yaml \
   -p 8006:8006 \
-  killiankopp/agent-recipe-creator python main_api.py
+  agent-recipe-creator
 ```
 
 **Kubernetes ConfigMap :**
