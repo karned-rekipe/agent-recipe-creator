@@ -165,7 +165,7 @@ def _validate_llm_credentials(config: AgentConfig) -> None:
     missing_key = (
         not settings.api_key
         or settings.api_key.startswith("${")
-        or settings.api_key in {"local", "sk-ant-XXXX"}
+        or settings.api_key in {"local", "sk-ant-XXXX", "sk-proj-XXXX"}
     )
     if not missing_key:
         return

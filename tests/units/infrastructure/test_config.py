@@ -365,6 +365,23 @@ def test_load_agent_config_rejects_missing_openai_key(tmp_path: Path, monkeypatc
         load_agent_config(config_file)
 
 
+def test_load_agent_config_rejects_openai_template_placeholder(tmp_path: Path):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.dump({
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {
+            "planner": {
+                "provider": "openai",
+                "model_name": "gpt-5.4-mini",
+                "api_key": "sk-proj-XXXX",
+            }
+        },
+    }))
+
+    with pytest.raises(ValueError, match="Clé OpenAI manquante"):
+        load_agent_config(config_file)
+
+
 def test_load_agent_config_accepts_local_openai_without_real_key(tmp_path: Path):
     config_file = tmp_path / "config.yaml"
     config_file.write_text(yaml.dump({
