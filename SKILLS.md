@@ -102,7 +102,7 @@ print([t.name for t in tools])
 
 2. `_PydanticAIPlanner` (`adapters/output/recipe_agent/_planner.py`) résout automatiquement le provider :
     - `anthropic` → `AnthropicModel` + `AnthropicProvider`
-    - `openai` sans `base_url` → `OpenAIChatModel`
+    - `openai` sans `base_url` → `OpenAIResponsesModel`
     - `openai` avec `base_url` → `OpenAIChatModel` avec profil local (`prompted`, pas de thinking tokens)
 
 ### Validation
@@ -164,4 +164,3 @@ db["agent_runs"].find({ status: "failed" }).sort({ created_at: -1 }).limit(10)
 | `error`                         | Message d'erreur si `status=failed`                    |
 | `metadata.elapsed_ms`           | Durée d'exécution                                      |
 | `metadata.resolved_ingredients` | Nombre d'ingrédients résolus                           |
-

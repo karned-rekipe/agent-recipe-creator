@@ -2,7 +2,7 @@ from typing import cast
 
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.models.openai import OpenAIChatModel, OpenAIModelProfile
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIModelProfile, OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -67,14 +67,17 @@ def _build_model(settings: LMSettings):
             settings.model_name,
             provider = AnthropicProvider(api_key = settings.api_key),
         )
-    if not settings.base_url:
-        raise ValueError("base_url is required for provider='openai'")
-    logger.debug(f"planner provider=openai model={settings.model_name} base_url={settings.base_url}")
-    return OpenAIChatModel(
-        settings.model_name,
-        provider = OpenAIProvider(base_url = settings.base_url, api_key = settings.api_key),
-        profile = _LOCAL_PROFILE,
-    )
+    provider = OpenAIProvider(base_url = settings.base_url, api_key = settings.api_key)
+    if settings.base_url:
+        logger.debug(f"planner provider=openai-local model={settings.model_name} base_url={settings.base_url}")
+        return OpenAIChatModel(
+            settings.model_name,
+            provider = provider,
+            profile = _LOCAL_PROFILE,
+        )
+
+    logger.debug(f"planner provider=openai model={settings.model_name}")
+    return OpenAIResponsesModel(settings.model_name, provider = provider)
 
 
 class _PydanticAIPlanner:

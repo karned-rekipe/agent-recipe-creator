@@ -118,9 +118,9 @@ recipe_api:
 
 lm:
   planner:
-    provider: anthropic              # anthropic | openai
-    model_name: claude-haiku-4-5-20251001
-    api_key: ${ANTHROPIC_API_KEY}    # fallback ; la valeur cible vient de Vault via config/secrets.yaml
+    provider: openai                 # anthropic | openai
+    model_name: gpt-5.4-mini
+    api_key: ${OPENAI_API_KEY}       # fallback ; la valeur cible vient de Vault via config/secrets.yaml
     # Pour un LLM local (LM Studio / Ollama) :
     # provider: openai
     # base_url: http://127.0.0.1:1234/v1
@@ -144,10 +144,10 @@ mcp:
 ## Ordre de démarrage (dev local)
 
 ```bash
-# 0. Configurer Anthropic dans Vault
+# 0. Configurer OpenAI dans Vault
 export VAULT_ADDR="http://127.0.0.1:5991"
 export VAULT_TOKEN="<token-vault>"
-vault kv put kv/rekipe/agent-recipe-creator/anthropic value="sk-ant-..."
+vault kv put kv/rekipe/agent-recipe-creator/openai value="<cle-openai>"
 
 # 1. Démarrer recipe/
 cd recipe && uv run --frozen python main_mcp_http.py

@@ -159,13 +159,26 @@ def _resolve_config_secrets(data: dict[str, Any]) -> dict[str, Any]:
 
 def _validate_llm_credentials(config: AgentConfig) -> None:
     settings = config.lm.planner
-    if settings.provider != "anthropic":
+    if settings.provider == "openai" and settings.base_url:
         return
 
-    if not settings.api_key or settings.api_key.startswith("${") or settings.api_key == "sk-ant-XXXX":
+    missing_key = (
+        not settings.api_key
+        or settings.api_key.startswith("${")
+        or settings.api_key in {"local", "sk-ant-XXXX"}
+    )
+    if not missing_key:
+        return
+
+    if settings.provider == "anthropic":
         raise ValueError(
             "Clé Anthropic manquante. Crée agent-recipe-creator/secrets.yaml "
             "depuis secrets.yaml.template ou exporte ANTHROPIC_API_KEY."
+        )
+    if settings.provider == "openai":
+        raise ValueError(
+            "Clé OpenAI manquante. Configure le secret Vault "
+            "rekipe/agent-recipe-creator/openai ou exporte OPENAI_API_KEY."
         )
 
 

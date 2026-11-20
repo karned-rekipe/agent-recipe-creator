@@ -108,7 +108,11 @@ def test_load_agent_config_ignores_extra_fields(tmp_path: Path):
     config_file = tmp_path / "config.yaml"
     config_data = {
         "mcp_registry": {"url": "http://localhost:8302/mcp"},
-        "lm": {"planner": {"model_name": "gpt-4", "unknown_field": "ignored"}},
+        "lm": {"planner": {
+            "model_name": "gpt-4",
+            "api_key": "test-key",
+            "unknown_field": "ignored",
+        }},
         "adapters": {"repository": "mongodb"},
         "api": {"port": 8006},
     }
@@ -150,6 +154,25 @@ def test_load_agent_config_expands_env_var(tmp_path: Path, monkeypatch: pytest.M
     }))
     config = load_agent_config(config_file)
     assert config.lm.planner.api_key == "sk-ant-from-env"
+
+
+def test_load_agent_config_expands_openai_env_var(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-from-env")
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.dump({
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {
+            "planner": {
+                "provider": "openai",
+                "model_name": "gpt-5.4-mini",
+                "api_key": "${OPENAI_API_KEY}",
+            }
+        },
+    }))
+
+    config = load_agent_config(config_file)
+
+    assert config.lm.planner.api_key == "sk-openai-from-env"
 
 
 def test_load_agent_config_merges_secrets_yaml(tmp_path: Path):
@@ -322,3 +345,40 @@ def test_load_agent_config_rejects_missing_anthropic_key(tmp_path: Path, monkeyp
     }))
     with pytest.raises(ValueError, match="Clé Anthropic manquante"):
         load_agent_config(config_file)
+
+
+def test_load_agent_config_rejects_missing_openai_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.dump({
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {
+            "planner": {
+                "provider": "openai",
+                "model_name": "gpt-5.4-mini",
+                "api_key": "${OPENAI_API_KEY}",
+            }
+        },
+    }))
+
+    with pytest.raises(ValueError, match="Clé OpenAI manquante"):
+        load_agent_config(config_file)
+
+
+def test_load_agent_config_accepts_local_openai_without_real_key(tmp_path: Path):
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.dump({
+        "mcp_registry": {"url": "http://localhost:8302/mcp"},
+        "lm": {
+            "planner": {
+                "provider": "openai",
+                "model_name": "qwen3-9b",
+                "base_url": "http://localhost:1234/v1",
+                "api_key": "local",
+            }
+        },
+    }))
+
+    config = load_agent_config(config_file)
+
+    assert config.lm.planner.base_url == "http://localhost:1234/v1"
