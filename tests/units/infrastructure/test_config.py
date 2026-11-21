@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from arclith import Arclith
 
 from infrastructure.config import (
     AgentConfig,
@@ -173,6 +174,30 @@ def test_load_agent_config_expands_openai_env_var(tmp_path: Path, monkeypatch: p
     config = load_agent_config(config_file)
 
     assert config.lm.planner.api_key == "sk-openai-from-env"
+
+
+def test_arclith_resolves_mongodb_uri_from_environment(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("ADAPTERS_MONGODB_URI", "mongodb://runtime.example/rekipe")
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text(yaml.dump({
+        "adapters": {
+            "repository": "mongodb",
+            "multitenant": False,
+            "mongodb": {"db_name": "rekipe_agent_preprod"},
+        },
+        "secrets": {
+            "resolver": "env",
+            "mappings": {"adapters.mongodb.uri": "ADAPTERS_MONGODB_URI"},
+        },
+    }))
+
+    arclith = Arclith(config_file)
+
+    assert arclith.config.adapters.mongodb is not None
+    assert arclith.config.adapters.mongodb.uri == "mongodb://runtime.example/rekipe"
 
 
 def test_load_agent_config_merges_secrets_yaml(tmp_path: Path):
