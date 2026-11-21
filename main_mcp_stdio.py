@@ -13,4 +13,4 @@ mcp = arclith.fastmcp("Rekipe - Recipe Creator Agent")
 register_tools(mcp, arclith)
 
 if __name__ == "__main__":
-    arclith.run_mcp_stdio(mcp)
+    mcp.run(transport="stdio")
