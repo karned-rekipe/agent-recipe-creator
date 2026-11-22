@@ -31,6 +31,7 @@ jobs:
         with:
           args: --no-progress --offline './docs/**/*.md' './README.md'
           fail: true
+          failIfEmpty: false
 
   publish:
     name: Generate and publish
