@@ -3,7 +3,7 @@ import pytest
 from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun
-from domain.models.recipe import RecipeResult
+from domain.models.recipe import RecipeResult, RecipeSource
 from domain.ports.recipe_agent import RecipeAgentPort
 from tests.units.conftest import NullLogger
 
@@ -18,6 +18,8 @@ class _SuccessAgent(RecipeAgentPort):
             run_uuid: str,
             *,
             allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
     ) -> RecipeResult:
         return self._result
 
@@ -29,6 +31,8 @@ class _FailingAgent(RecipeAgentPort):
             run_uuid: str,
             *,
             allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
     ) -> RecipeResult:
         raise RuntimeError("LLM unavailable")
 
@@ -90,6 +94,8 @@ async def test_execute_passes_allow_duplicate_to_agent():
                 run_uuid: str,
                 *,
                 allow_duplicate: bool = False,
+                sources: list[RecipeSource] | None = None,
+                generate_image: bool = True,
         ) -> RecipeResult:
             received.append(allow_duplicate)
             return _make_result()
@@ -148,6 +154,8 @@ async def test_execute_unwraps_single_exception_group():
                 run_uuid: str,
                 *,
                 allow_duplicate: bool = False,
+                sources: list[RecipeSource] | None = None,
+                generate_image: bool = True,
         ) -> RecipeResult:
             raise BaseExceptionGroup("group", [ValueError("inner error")])
 
@@ -170,6 +178,8 @@ async def test_execute_reraises_multi_exception_group():
                 run_uuid: str,
                 *,
                 allow_duplicate: bool = False,
+                sources: list[RecipeSource] | None = None,
+                generate_image: bool = True,
         ) -> RecipeResult:
             raise BaseExceptionGroup("group", [ValueError("e1"), RuntimeError("e2")])
 

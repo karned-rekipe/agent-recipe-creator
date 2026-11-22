@@ -3,7 +3,7 @@ import time
 from arclith.domain.ports.logger import Logger
 from arclith.domain.ports.repository import Repository
 from domain.models.agent_run import AgentRun
-from domain.models.recipe import RecipeResult
+from domain.models.recipe import RecipeResult, RecipeSource
 from domain.ports.recipe_agent import RecipeAgentPort
 
 
@@ -18,14 +18,28 @@ class ProcessRawRecipeUseCase:
         self._run_repository = run_repository
         self._logger = logger
 
-    async def execute(self, raw_text: str, *, allow_duplicate: bool = False) -> RecipeResult:
-        run = await self._run_repository.create(AgentRun(raw_input = raw_text, status = "running"))
+    async def execute(
+            self,
+            raw_text: str,
+            *,
+            allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            audit_input: str | None = None,
+            generate_image: bool = True,
+    ) -> RecipeResult:
+        run = await self._run_repository.create(AgentRun(raw_input = audit_input or raw_text, status = "running"))
         run_uuid = str(run.uuid)
         self._logger.info("▶ Agent run started", run_uuid = run_uuid, input_length = len(raw_text))
         t0 = time.perf_counter()
 
         try:
-            result = await self._agent.process(raw_text, run_uuid, allow_duplicate = allow_duplicate)
+            result = await self._agent.process(
+                raw_text,
+                run_uuid,
+                allow_duplicate=allow_duplicate,
+                sources=sources,
+                generate_image=generate_image,
+            )
             elapsed_ms = round((time.perf_counter() - t0) * 1000)
             await self._run_repository.update(
                 run.model_copy(update = {
@@ -39,6 +53,8 @@ class ProcessRawRecipeUseCase:
                         "created": result.created,
                         "duplicate_confirmation_required": result.duplicate_confirmation_required,
                         "existing_recipe_uuid": result.existing_recipe_uuid,
+                        "image_generated": result.image_generated,
+                        "warnings": result.warnings,
                     },
                 })
             )

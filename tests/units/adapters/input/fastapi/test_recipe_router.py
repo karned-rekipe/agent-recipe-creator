@@ -7,7 +7,7 @@ from application.services.recipe_service import RecipeService
 from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun
-from domain.models.recipe import RecipeResult
+from domain.models.recipe import RecipeResult, RecipeSource
 from domain.ports.recipe_agent import RecipeAgentPort
 from tests.units.conftest import NullLogger
 
@@ -19,6 +19,8 @@ class _SuccessAgent(RecipeAgentPort):
             run_uuid: str,
             *,
             allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
     ) -> RecipeResult:
         return RecipeResult(
             recipe_uuid = "r-uuid",
@@ -36,8 +38,23 @@ class _FailingAgent(RecipeAgentPort):
             run_uuid: str,
             *,
             allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
     ) -> RecipeResult:
         raise RuntimeError("agent failed")
+
+
+class _InvalidInputAgent(RecipeAgentPort):
+    async def process(
+            self,
+            raw_text: str,
+            run_uuid: str,
+            *,
+            allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
+    ) -> RecipeResult:
+        raise ValueError("Recipe URL must resolve only to public addresses")
 
 
 def _make_router(agent: RecipeAgentPort) -> RecipeRouter:
@@ -66,6 +83,8 @@ async def test_ai_create_returns_duplicate_confirmation():
                 run_uuid: str,
                 *,
                 allow_duplicate: bool = False,
+                sources: list[RecipeSource] | None = None,
+                generate_image: bool = True,
         ) -> RecipeResult:
             return RecipeResult(
                 recipe_uuid = "existing-r",
@@ -99,6 +118,8 @@ async def test_ai_create_passes_allow_duplicate():
                 run_uuid: str,
                 *,
                 allow_duplicate: bool = False,
+                sources: list[RecipeSource] | None = None,
+                generate_image: bool = True,
         ) -> RecipeResult:
             received.append(allow_duplicate)
             return RecipeResult(
@@ -125,3 +146,12 @@ async def test_ai_create_raises_500_on_agent_failure():
         await router.ai_create(payload, Response())
     assert exc_info.value.status_code == 500
     assert "agent failed" in exc_info.value.detail
+
+
+async def test_ai_create_raises_422_on_invalid_source():
+    router = _make_router(_InvalidInputAgent())
+    payload = AiCreateRequestSchema(raw_text="Recette valide mais source refusée pendant la résolution")
+    with pytest.raises(HTTPException) as exc_info:
+        await router.ai_create(payload, Response())
+    assert exc_info.value.status_code == 422
+    assert "public addresses" in exc_info.value.detail
