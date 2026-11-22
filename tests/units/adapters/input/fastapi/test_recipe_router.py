@@ -21,6 +21,7 @@ class _SuccessAgent(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
         return RecipeResult(
             recipe_uuid = "r-uuid",
@@ -40,6 +41,7 @@ class _FailingAgent(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
         raise RuntimeError("agent failed")
 
@@ -53,6 +55,7 @@ class _InvalidInputAgent(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
         raise ValueError("Recipe URL must resolve only to public addresses")
 
@@ -85,6 +88,7 @@ async def test_ai_create_returns_duplicate_confirmation():
                 allow_duplicate: bool = False,
                 sources: list[RecipeSource] | None = None,
                 generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             return RecipeResult(
                 recipe_uuid = "existing-r",
@@ -120,6 +124,7 @@ async def test_ai_create_passes_allow_duplicate():
                 allow_duplicate: bool = False,
                 sources: list[RecipeSource] | None = None,
                 generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             received.append(allow_duplicate)
             return RecipeResult(

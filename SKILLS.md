@@ -166,3 +166,4 @@ db["agent_runs"].find({ status: "failed" }).sort({ created_at: -1 }).limit(10)
 | `metadata.resolved_ingredients` | Nombre d'ingrédients résolus                           |
 | `metadata.current_stage`        | Phase courante du graphe pour l'affichage de progression |
 | `metadata.stage_history`        | Phases déjà traversées par le traitement              |
+| `metadata.tracking_id`          | Identifiant client d'une création suivie par l'interface |

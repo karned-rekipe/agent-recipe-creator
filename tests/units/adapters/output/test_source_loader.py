@@ -10,6 +10,7 @@ from adapters.output.source_loader.web_recipe_source_loader import (
     _format_recipe,
     _instruction_text,
 )
+from domain.ports.recipe_source_loader import RemoteRecipeDocument
 
 
 def _transport(response_factory):
@@ -102,7 +103,7 @@ async def test_load_rejects_private_address():
 
 async def test_load_rejects_non_html_and_empty_pages():
     non_html = WebRecipeSourceLoader(
-        transport=_transport(lambda request: httpx.Response(200, content=b"pdf", headers={"content-type": "application/pdf"})),
+        transport=_transport(lambda request: httpx.Response(200, content=b"data", headers={"content-type": "application/octet-stream"})),
         host_resolver=_public_host,
     )
     with pytest.raises(ValueError, match="HTML"):
@@ -114,6 +115,20 @@ async def test_load_rejects_non_html_and_empty_pages():
     )
     with pytest.raises(ValueError, match="No usable"):
         await empty.load("https://recipes.example/empty")
+
+
+@pytest.mark.parametrize("media_type", ["image/jpeg", "application/pdf"])
+async def test_load_identifies_remote_documents_for_ocr(media_type: str):
+    loader = WebRecipeSourceLoader(
+        transport=_transport(lambda request: httpx.Response(200, content=b"document", headers={"content-type": media_type})),
+        host_resolver=_public_host,
+    )
+
+    with pytest.raises(RemoteRecipeDocument) as exc_info:
+        await loader.load("https://recipes.example/source")
+
+    assert exc_info.value.url == "https://recipes.example/source"
+    assert exc_info.value.media_type == media_type
 
 
 def test_json_ld_helpers_handle_graph_invalid_blocks_and_nested_instructions():

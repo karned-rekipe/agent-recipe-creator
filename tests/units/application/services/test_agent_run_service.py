@@ -88,3 +88,24 @@ async def test_find_running_recipe_enrichment():
     assert found.uuid == running.uuid
     assert found.metadata["current_stage"] == "reviewing"
     assert await service.find_running_recipe_enrichment("unknown") is None
+
+
+async def test_find_running_recipe_creation_by_tracking_id():
+    repo = InMemoryRepository[AgentRun]()
+    service = AgentRunService(repo, NullLogger())
+    running = await service.create(AgentRun(
+        raw_input="recipe-url:https://example.test",
+        status="running",
+        metadata={"tracking_id": "create-123", "current_stage": "analyzing"},
+    ))
+    await service.create(AgentRun(
+        raw_input="other",
+        status="running",
+        metadata={"tracking_id": "create-456"},
+    ))
+
+    found = await service.find_running_recipe_creation("create-123")
+
+    assert found is not None
+    assert found.uuid == running.uuid
+    assert await service.find_running_recipe_creation("unknown") is None

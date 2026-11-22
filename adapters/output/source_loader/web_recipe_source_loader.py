@@ -11,11 +11,12 @@ import httpx
 
 from domain.models.recipe import RecipeSource
 from domain.models.recipe_intake import ResolvedRecipeInput
-from domain.ports.recipe_source_loader import RecipeSourceLoaderPort
+from domain.ports.recipe_source_loader import RemoteRecipeDocument, RecipeSourceLoaderPort
 
 _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _MAX_TEXT_CHARS = 80_000
 _MAX_REDIRECTS = 3
+_OCR_MEDIA_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"}
 
 
 class UnsafeRecipeURL(ValueError):
@@ -93,7 +94,10 @@ class WebRecipeSourceLoader(RecipeSourceLoaderPort):
                 break
 
         content_type = response.headers.get("content-type", "").lower()
-        if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
+        media_type = content_type.split(";", 1)[0].strip()
+        if media_type in _OCR_MEDIA_TYPES:
+            raise RemoteRecipeDocument(current_url, media_type)
+        if media_type not in {"text/html", "application/xhtml+xml"}:
             raise ValueError("Recipe URL must return an HTML document")
         if len(response.content) > _MAX_RESPONSE_BYTES:
             raise ValueError("Recipe page is too large")

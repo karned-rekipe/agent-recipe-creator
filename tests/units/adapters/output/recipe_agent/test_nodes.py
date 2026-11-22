@@ -196,9 +196,15 @@ async def test_review_plan_node_returns_reviewed_plan():
 async def test_check_recipe_not_found():
     registry = FakeRegistry()
     node = make_check_recipe_node(registry, _no_match)
-    state = _base_state(plan = _make_plan())
+    stages: list[str] = []
+
+    async def report(stage: str) -> None:
+        stages.append(stage)
+
+    state = _base_state(plan = _make_plan(), progress_callback=report)
     result = await node(state)
     assert result["recipe_exists"] is False
+    assert stages == ["checking_duplicate"]
 
 
 async def test_check_recipe_found():
@@ -385,13 +391,22 @@ async def test_resolve_ustensils_keeps_parent_equipment_when_components_exist():
 async def test_create_recipe_stores_uuid():
     registry = FakeRegistry()
     node = make_create_recipe_node(registry)
-    state = _base_state(plan = _make_plan(name = "Tarte Tatin", description = "Tarte aux pommes caramélisées"))
+    stages: list[str] = []
+
+    async def report(stage: str) -> None:
+        stages.append(stage)
+
+    state = _base_state(
+        plan=_make_plan(name="Tarte Tatin", description="Tarte aux pommes caramélisées"),
+        progress_callback=report,
+    )
     result = await node(state)
     assert result["recipe_uuid"] == "recipe-uuid"
     assert len(registry.created_recipes) == 1
     assert registry.created_recipes[0]["name"] == "Tarte Tatin"
     assert registry.created_recipes[0]["servings"] == 1
     assert registry.created_recipes[0]["ingredients"] == []
+    assert stages == ["saving"]
 
 
 def test_parse_mixed_fraction_and_its_unit():

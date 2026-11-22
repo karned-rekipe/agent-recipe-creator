@@ -20,7 +20,12 @@ class _SuccessAgent(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
+        if progress_callback is not None:
+            await progress_callback("analyzing")
+            await progress_callback("checking_duplicate")
+            await progress_callback("saving")
         return self._result
 
 
@@ -33,7 +38,10 @@ class _FailingAgent(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
+        if progress_callback is not None:
+            await progress_callback("analyzing")
         raise RuntimeError("LLM unavailable")
 
 
@@ -82,6 +90,24 @@ async def test_execute_success_stores_metadata():
     assert run.metadata["resolved_ustensils"] == 1
     assert run.metadata["created"] is True
     assert run.metadata["duplicate_confirmation_required"] is False
+    assert run.metadata["current_stage"] == "complete"
+    assert run.metadata["stage_history"] == [
+        "starting",
+        "analyzing",
+        "checking_duplicate",
+        "saving",
+        "complete",
+    ]
+
+
+async def test_execute_stores_client_tracking_id():
+    repo = InMemoryRepository[AgentRun]()
+    use_case = ProcessRawRecipeUseCase(_SuccessAgent(_make_result()), repo, NullLogger())
+
+    await use_case.execute("recette de beignets", tracking_id="create-123")
+
+    run = (await repo.find_all())[0]
+    assert run.metadata["tracking_id"] == "create-123"
 
 
 async def test_execute_passes_allow_duplicate_to_agent():
@@ -96,6 +122,7 @@ async def test_execute_passes_allow_duplicate_to_agent():
                 allow_duplicate: bool = False,
                 sources: list[RecipeSource] | None = None,
                 generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             received.append(allow_duplicate)
             return _make_result()
@@ -136,6 +163,8 @@ async def test_execute_failure_updates_run_to_failed():
     assert run.status == "failed"
     assert run.error == "LLM unavailable"
     assert "elapsed_ms" in run.metadata
+    assert run.metadata["current_stage"] == "failed"
+    assert run.metadata["stage_history"] == ["starting", "analyzing", "failed"]
 
 
 async def test_execute_failure_reraises_original_exception():
@@ -156,6 +185,7 @@ async def test_execute_unwraps_single_exception_group():
                 allow_duplicate: bool = False,
                 sources: list[RecipeSource] | None = None,
                 generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             raise BaseExceptionGroup("group", [ValueError("inner error")])
 
@@ -180,6 +210,7 @@ async def test_execute_reraises_multi_exception_group():
                 allow_duplicate: bool = False,
                 sources: list[RecipeSource] | None = None,
                 generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             raise BaseExceptionGroup("group", [ValueError("e1"), RuntimeError("e2")])
 

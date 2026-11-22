@@ -4,11 +4,13 @@ from typing import Literal
 
 from domain.models.recipe import RecipeResult, RecipeSource
 
-RecipeEnrichmentStage = Literal[
+RecipeProcessingStage = Literal[
     "starting",
+    "reading_source",
     "loading_recipe",
     "analyzing",
     "reviewing",
+    "checking_duplicate",
     "organizing",
     "ingredients",
     "equipment",
@@ -17,7 +19,8 @@ RecipeEnrichmentStage = Literal[
     "complete",
     "failed",
 ]
-RecipeProgressCallback = Callable[[RecipeEnrichmentStage], Awaitable[None]]
+RecipeEnrichmentStage = RecipeProcessingStage
+RecipeProgressCallback = Callable[[RecipeProcessingStage], Awaitable[None]]
 
 
 class RecipeAgentPort(ABC):
@@ -30,6 +33,7 @@ class RecipeAgentPort(ABC):
         allow_duplicate: bool = False,
         sources: list[RecipeSource] | None = None,
         generate_image: bool = True,
+        progress_callback: RecipeProgressCallback | None = None,
     ) -> RecipeResult: ...
 
     async def enrich(

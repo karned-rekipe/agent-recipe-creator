@@ -10,10 +10,16 @@ class AiCreateRequestSchema(BaseModel):
         examples = ["Tarte tatin : 6 pommes, 150g beurre, 200g sucre…"],
         min_length = 10,
     )
-    source_url: str | None = Field(None, description="URL publique d'une fiche recette Web")
+    source_url: str | None = Field(None, description="URL publique d'une fiche Web, d'une image ou d'un PDF de recette")
     image_url: str | None = Field(None, description="URL publique d'une image contenant une recette")
-    image_base64: str | None = Field(None, description="Image encodée en base64, sans préfixe data URL")
-    image_media_type: str | None = Field(None, description="Type MIME de image_base64, par exemple image/jpeg")
+    image_base64: str | None = Field(None, description="Image ou PDF encodé en base64, sans préfixe data URL")
+    image_media_type: str | None = Field(None, description="Type MIME de image_base64, par exemple image/jpeg ou application/pdf")
+    tracking_id: str | None = Field(
+        None,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Identifiant client permettant de suivre la progression de cette création.",
+    )
     allow_duplicate: bool = Field(
         False,
         description = "Créer un doublon si une recette équivalente existe déjà.",

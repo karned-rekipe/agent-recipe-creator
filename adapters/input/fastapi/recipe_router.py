@@ -38,6 +38,7 @@ class RecipeRouter:
                 payload.to_domain(),
                 allow_duplicate=payload.allow_duplicate,
                 generate_image=payload.generate_image,
+                tracking_id=payload.tracking_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc

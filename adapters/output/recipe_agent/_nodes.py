@@ -9,12 +9,12 @@ from adapters.output.recipe_agent._mcp_registry import _MCPRecipeRegistry
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
 from adapters.output.recipe_agent._state import RecipeAgentState
 from domain.models.recipe import RecipeComponentPlan, RecipePlan
-from domain.ports.recipe_agent import RecipeEnrichmentStage
+from domain.ports.recipe_agent import RecipeProcessingStage
 
 type RecipePlanLike = RecipePlan | RecipeComponentPlan
 
 
-async def _report_progress(state: RecipeAgentState, stage: RecipeEnrichmentStage) -> None:
+async def _report_progress(state: RecipeAgentState, stage: RecipeProcessingStage) -> None:
     callback = state.get("progress_callback")
     if callback is not None:
         await callback(stage)
@@ -67,6 +67,7 @@ def make_review_plan_node(planner: _PydanticAIPlanner) -> Callable:
 
 def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def check_recipe_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "checking_duplicate")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [check_recipe] name={plan.name!r}")
@@ -222,6 +223,7 @@ def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable)
 
 def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_recipe_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "saving")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [create_recipe] name={plan.name!r}")

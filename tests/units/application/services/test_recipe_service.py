@@ -19,6 +19,7 @@ class _StubAgent(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
         return self._result
 
@@ -52,6 +53,7 @@ async def test_ai_create_passes_raw_text_to_agent():
                 allow_duplicate: bool = False,
                 sources: list[RecipeSource] | None = None,
                 generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             received.append((raw_text, allow_duplicate))
             return RecipeResult(

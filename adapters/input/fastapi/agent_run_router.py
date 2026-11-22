@@ -22,6 +22,12 @@ class AgentRunRouter:
             methods=["GET"],
             response_model=AgentRunSchema,
         )
+        self.router.add_api_route(
+            "/creations/{tracking_id}/running",
+            self.get_running_recipe_creation,
+            methods=["GET"],
+            response_model=AgentRunSchema,
+        )
         self.router.add_api_route("/{uuid}", self.get_run, methods = ["GET"], response_model = AgentRunSchema)
 
     async def list_runs(self) -> list[AgentRunSchema]:
@@ -41,4 +47,11 @@ class AgentRunRouter:
         run = await self._service.find_running_recipe_enrichment(recipe_uuid)
         if run is None:
             raise HTTPException(status_code=404, detail="No running enrichment for this recipe")
+        return AgentRunSchema.model_validate(run, from_attributes=True)
+
+    async def get_running_recipe_creation(self, tracking_id: str) -> AgentRunSchema:
+        """Return the active AI creation run matching a client tracking identifier."""
+        run = await self._service.find_running_recipe_creation(tracking_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="No running recipe creation for this tracking id")
         return AgentRunSchema.model_validate(run, from_attributes=True)

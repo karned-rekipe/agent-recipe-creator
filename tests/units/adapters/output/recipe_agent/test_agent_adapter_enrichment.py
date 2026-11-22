@@ -46,11 +46,22 @@ async def test_process_builds_extended_state_and_result():
     adapter = object.__new__(RecipeAgentAdapter)
     graph = _Graph(_graph_result())
     adapter._graph = graph
-    result = await adapter.process("Recette de soupe", "run-1", generate_image=True)
+    stages: list[RecipeEnrichmentStage] = []
+
+    async def report(stage: RecipeEnrichmentStage) -> None:
+        stages.append(stage)
+
+    result = await adapter.process(
+        "Recette de soupe",
+        "run-1",
+        generate_image=True,
+        progress_callback=report,
+    )
     assert result.created is True
     assert result.image_generated is True
     assert graph.state is not None
     assert graph.state["generate_image"] is True
+    assert graph.state["progress_callback"] is report
 
 
 async def test_enrich_loads_existing_recipe_and_updates_in_place():

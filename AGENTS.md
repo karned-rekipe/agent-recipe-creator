@@ -10,7 +10,7 @@ Pour le contexte global du projet et les conventions transverses, voir `../AGENT
 ## Contexte global
 
 `agent-recipe-creator/` est l'agent IA de Rekipe. Il transforme du texte brut,
-une fiche Web ou le texte OCR d'une image en entités structurées persistées
+une fiche Web ou le texte OCR d'une image ou d'un PDF en entités structurées persistées
 dans `recipe/`. Il peut aussi mettre à niveau une recette existante. Il ne
 possède aucune entité métier recette propre — il délègue toute persistance au
 service `recipe/`.
@@ -18,7 +18,7 @@ service `recipe/`.
 ## Rôle
 
 - Structurer une recette en langage naturel via un LLM (`_PydanticAIPlanner`)
-- Résoudre une entrée texte, URL de fiche, image ou URL d'image
+- Résoudre une entrée texte, un lien Web/image/PDF ou un document image/PDF
 - Compléter origine, difficulté et prix ; ventiler les temps dans les étapes
 - Résoudre les ingrédients et ustensiles existants par fuzzy matching (`rapidfuzz`)
 - Créer les entités manquantes et créer la recette complète dans `recipe/`
@@ -32,7 +32,7 @@ service `recipe/`.
 - Architecture hexagonale : `domain → application → adapters → infrastructure`
 - `domain/` n'importe que `arclith` (Entity) et `pydantic` — zéro dépendance framework
 - Toute interaction avec `recipe/` passe par `_MCPRecipeRegistry` (adapter output)
-- Toute extraction d'image passe par `MCPOCRClient` vers le MCP de `ocr/`
+- Toute extraction de document passe par `MCPOCRClient` vers le MCP de `ocr/`
 - Le graphe LangGraph est construit et compilé dans `agent_adapter.py` uniquement
 - Les nœuds du graphe sont des factories dans `_nodes.py` — ne pas instancier des classes de nœuds
 - Ports : REST `:8006`, MCP `:8004`
@@ -46,11 +46,11 @@ domain/
   models/
     agent_run.py    # AgentRun — entité de traçabilité (status, recipe_uuid, metadata)
     recipe.py       # RecipePlan, RecipeResult, IngredientLine, UstensilLine, RecipeStep
-    recipe_intake.py # Entrée exclusive texte, URL, image ou URL d'image
+    recipe_intake.py # Entrée exclusive texte, URL ou document image/PDF
     ingredient.py   # Ingredient local (non persisté)
   ports/
     recipe_agent.py # RecipeAgentPort — création et enrichissement en place
-    recipe_ocr.py   # RecipeOCRPort — extraction stateless d'une image
+    recipe_ocr.py   # RecipeOCRPort — extraction stateless d'une image ou d'un PDF
     recipe_source_loader.py # RecipeSourceLoaderPort — chargement Web public
 
 application/

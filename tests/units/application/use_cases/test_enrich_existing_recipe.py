@@ -30,6 +30,7 @@ class _Agent(RecipeAgentPort):
         allow_duplicate: bool = False,
         sources: list[RecipeSource] | None = None,
         generate_image: bool = True,
+        progress_callback: RecipeProgressCallback | None = None,
     ) -> RecipeResult:
         return _result()
 

@@ -22,12 +22,14 @@ class RecipeService:
         *,
         allow_duplicate: bool = False,
         generate_image: bool = True,
+        tracking_id: str | None = None,
     ) -> RecipeResult:
         if isinstance(recipe_input, str):
             return await self._use_case.execute(
                 recipe_input,
                 allow_duplicate=allow_duplicate,
                 generate_image=generate_image,
+                tracking_id=tracking_id,
             )
         if self._input_resolver is None:
             if recipe_input.raw_text is not None:
@@ -35,6 +37,7 @@ class RecipeService:
                     recipe_input.raw_text,
                     allow_duplicate=allow_duplicate,
                     generate_image=generate_image,
+                    tracking_id=tracking_id,
                 )
             raise RuntimeError("Recipe input resolver is not configured")
         resolved = await self._input_resolver.resolve(recipe_input)
@@ -44,6 +47,7 @@ class RecipeService:
             sources=resolved.sources,
             audit_input=resolved.audit_label,
             generate_image=generate_image,
+            tracking_id=tracking_id,
         )
 
     async def ai_enrich(self, recipe_uuid: str, *, generate_image: bool = True) -> RecipeResult:

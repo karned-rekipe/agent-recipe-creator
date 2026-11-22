@@ -87,6 +87,7 @@ class RecipeAgentAdapter(RecipeAgentPort):
             allow_duplicate: bool = False,
             sources: list[RecipeSource] | None = None,
             generate_image: bool = True,
+            progress_callback: RecipeProgressCallback | None = None,
     ) -> RecipeResult:
         initial_state: RecipeAgentState = {
             "messages": [HumanMessage(content = raw_text)],
@@ -106,7 +107,7 @@ class RecipeAgentAdapter(RecipeAgentPort):
             "image_generated": False,
             "warnings": [],
             "error": None,
-            "progress_callback": None,
+            "progress_callback": progress_callback,
         }
         result = await self._graph.ainvoke(initial_state)
         last_message = result["messages"][-1]
