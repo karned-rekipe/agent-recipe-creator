@@ -73,6 +73,22 @@ class WebRecipeSourceLoader(RecipeSourceLoaderPort):
 
     async def load(self, url: str) -> ResolvedRecipeInput:
         current_url = url.strip()
+        current_url, response = await self._fetch(current_url)
+
+        content_type = response.headers.get("content-type", "").lower()
+        media_type = content_type.split(";", 1)[0].strip()
+        if media_type in _OCR_MEDIA_TYPES:
+            raise RemoteRecipeDocument(current_url, media_type)
+        extracted = _extract_recipe_text(response, media_type)
+
+        parsed = urlparse(current_url)
+        return ResolvedRecipeInput(
+            raw_text=extracted[:_MAX_TEXT_CHARS],
+            audit_label=f"recipe-url:{current_url}",
+            sources=[RecipeSource(name=parsed.hostname or "Web", description="Recette importée depuis le Web", uri=current_url)],
+        )
+
+    async def _fetch(self, current_url: str) -> tuple[str, httpx.Response]:
         async with httpx.AsyncClient(
             transport=self._transport,
             follow_redirects=False,
@@ -92,29 +108,7 @@ class WebRecipeSourceLoader(RecipeSourceLoaderPort):
                     continue
                 response.raise_for_status()
                 break
-
-        content_type = response.headers.get("content-type", "").lower()
-        media_type = content_type.split(";", 1)[0].strip()
-        if media_type in _OCR_MEDIA_TYPES:
-            raise RemoteRecipeDocument(current_url, media_type)
-        if media_type not in {"text/html", "application/xhtml+xml"}:
-            raise ValueError("Recipe URL must return an HTML document")
-        if len(response.content) > _MAX_RESPONSE_BYTES:
-            raise ValueError("Recipe page is too large")
-
-        parser = _RecipeHTMLParser()
-        parser.feed(response.text)
-        recipe = _find_recipe_json_ld(parser.json_ld_blocks)
-        extracted = _format_recipe(recipe) if recipe else "\n".join(parser.visible_parts)[:_MAX_TEXT_CHARS]
-        if len(extracted.strip()) < 10:
-            raise ValueError("No usable recipe content found at URL")
-
-        parsed = urlparse(current_url)
-        return ResolvedRecipeInput(
-            raw_text=extracted[:_MAX_TEXT_CHARS],
-            audit_label=f"recipe-url:{current_url}",
-            sources=[RecipeSource(name=parsed.hostname or "Web", description="Recette importée depuis le Web", uri=current_url)],
-        )
+        return current_url, response
 
     async def _validate_public_url(self, url: str) -> None:
         parsed = urlparse(url)
@@ -133,6 +127,21 @@ class WebRecipeSourceLoader(RecipeSourceLoaderPort):
 
 def _resolve_host_addresses(hostname: str) -> list[str]:
     return sorted({str(item[4][0]) for item in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)})
+
+
+def _extract_recipe_text(response: httpx.Response, media_type: str) -> str:
+    if media_type not in {"text/html", "application/xhtml+xml"}:
+        raise ValueError("Recipe URL must return an HTML document")
+    if len(response.content) > _MAX_RESPONSE_BYTES:
+        raise ValueError("Recipe page is too large")
+
+    parser = _RecipeHTMLParser()
+    parser.feed(response.text)
+    recipe = _find_recipe_json_ld(parser.json_ld_blocks)
+    extracted = _format_recipe(recipe) if recipe else "\n".join(parser.visible_parts)[:_MAX_TEXT_CHARS]
+    if len(extracted.strip()) < 10:
+        raise ValueError("No usable recipe content found at URL")
+    return extracted
 
 
 def _find_recipe_json_ld(blocks: list[str]) -> dict[str, Any] | None:

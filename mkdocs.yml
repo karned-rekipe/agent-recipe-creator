@@ -1,0 +1,20 @@
+site_name: Rekipe Recipe Creator Agent
+site_description: Création multisource, enrichissement et suivi des recettes par IA
+repo_url: https://github.com/karned-rekipe/agent-recipe-creator
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: fr
+  font: false
+
+plugins:
+  - techdocs-core
+
+nav:
+  - Vue d'ensemble: backstage/index.md
+  - Architecture: backstage/architecture.md
+  - API et MCP: backstage/api.md
+  - Déploiement: backstage/deployment.md
+  - Exploitation: backstage/operations.md
+  - Décisions: decisions.md
