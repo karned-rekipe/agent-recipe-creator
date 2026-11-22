@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 import re
 import time
@@ -470,7 +470,7 @@ def _build_recipe_payload(
         components: list[dict] | None = None,
         include_ingredients: bool = True,
         sources: list | None = None,
-        tag_uuids: list[str] | None = None,
+        tag_uuids: Iterable[str] = (),
 ) -> dict:
     ingredients = []
     if include_ingredients:
@@ -513,7 +513,7 @@ def _build_recipe_payload(
         "difficulty": getattr(plan, "difficulty", None),
         "price": getattr(plan, "price", None),
         "sources": _merge_sources([*getattr(plan, "sources", []), *(sources or [])]),
-        "tag_uuids": tag_uuids or [],
+        "tag_uuids": list(tag_uuids),
     }
     if components:
         payload["components"] = components
