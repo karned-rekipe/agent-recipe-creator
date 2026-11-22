@@ -46,6 +46,8 @@ def _state(**updates):
         ),
         "resolved_ingredients": {"carotte": "ingredient-1"},
         "resolved_ustensils": {"casserole": "equipment-1"},
+        "available_tags": [],
+        "resolved_tags": {"soupe": "tag-2"},
         "resolved_components": [],
         "recipe_uuid": "recipe-1",
         "recipe_exists": False,
@@ -88,6 +90,7 @@ async def test_update_recipe_reclassifies_and_preserves_unrelated_fields():
     assert payload["secondary_images"] == ["/old.png"]
     assert payload["status"] == "active"
     assert payload["quality_status"] == "structured"
+    assert payload["tag_uuids"] == ["tag-1", "tag-2"]
     assert payload["ingredients"][0]["ingredient_uuid"] == "ingredient-1"
     assert payload["steps"][0] == {
         "name": "Cuire",

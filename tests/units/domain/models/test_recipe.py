@@ -52,6 +52,7 @@ def test_recipe_plan_defaults():
     assert plan.ustensils == []
     assert plan.steps == []
     assert plan.components == []
+    assert plan.tags == []
 
 
 def test_recipe_plan_full():
@@ -61,6 +62,7 @@ def test_recipe_plan_full():
         servings = "4 personnes",
         prep_time_minutes = 30,
         cook_time_minutes = 20,
+        tags=["plat principal", "végétarien"],
         ingredients = [
             IngredientLine(name = "farine", unit = "g", quantity = "500"),
             IngredientLine(name = "tomate"),
@@ -76,6 +78,7 @@ def test_recipe_plan_full():
     assert len(plan.steps) == 2
     assert plan.prep_time_minutes == 30
     assert plan.cook_time_minutes == 20
+    assert plan.tags == ["plat principal", "végétarien"]
 
 
 def test_recipe_plan_with_component():

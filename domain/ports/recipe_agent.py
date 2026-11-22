@@ -14,6 +14,7 @@ RecipeProcessingStage = Literal[
     "organizing",
     "ingredients",
     "equipment",
+    "tags",
     "saving",
     "image",
     "complete",

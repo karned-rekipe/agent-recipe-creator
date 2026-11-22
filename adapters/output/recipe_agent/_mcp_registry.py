@@ -181,6 +181,11 @@ class _MCPRecipeRegistry:
     async def create_ustensil(self, name: str) -> dict:
         return await self.create_equipment(name)
 
+    # ── Tags ──────────────────────────────────────────────────────────────────
+
+    async def list_tags(self) -> list[dict]:
+        return await self._call("list_tags", {})
+
     # ── Recipes ───────────────────────────────────────────────────────────────
 
     async def list_recipes(self, name: str) -> list[dict]:

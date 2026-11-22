@@ -61,7 +61,11 @@ async def test_process_builds_extended_state_and_result():
     assert result.image_generated is True
     assert graph.state is not None
     assert graph.state["generate_image"] is True
+    assert graph.state["available_tags"] == []
+    assert graph.state["resolved_tags"] == {}
     assert graph.state["progress_callback"] is report
+    assert graph.state["available_tags"] == []
+    assert graph.state["resolved_tags"] == {}
 
 
 async def test_enrich_loads_existing_recipe_and_updates_in_place():

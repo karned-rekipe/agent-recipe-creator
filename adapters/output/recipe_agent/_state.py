@@ -12,6 +12,8 @@ class RecipeAgentState(TypedDict):
     plan: RecipePlan | None
     resolved_ingredients: dict[str, str]  # name → uuid
     resolved_ustensils: dict[str, str]  # name → uuid
+    available_tags: list[dict]
+    resolved_tags: dict[str, str]  # name → uuid
     resolved_components: list[dict]
     recipe_uuid: str | None
     recipe_exists: bool | None
