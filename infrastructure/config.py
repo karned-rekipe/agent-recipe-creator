@@ -5,7 +5,7 @@ from typing import Any
 
 from arclith.infrastructure.secret_factory import build_secret_resolver
 import yaml
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class LMSettings(BaseModel):
@@ -23,10 +23,24 @@ class LMConfig(BaseModel):
     planner: LMSettings
 
 
+class OAuthClientCredentialsSettings(BaseModel):
+    model_config = ConfigDict(extra = "ignore")
+
+    token_url: str
+    client_id: str
+    client_secret: SecretStr
+    scopes: list[str] = Field(default_factory=lambda: [
+        "recipes:read",
+        "recipes:write",
+        "recipes:image:generate",
+    ])
+
+
 class MCPRegistrySettings(BaseModel):
     model_config = ConfigDict(extra = "ignore")
 
     url: str
+    oauth: OAuthClientCredentialsSettings | None = None
 
 
 class OCRSettings(BaseModel):

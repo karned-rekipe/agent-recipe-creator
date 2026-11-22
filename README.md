@@ -27,6 +27,11 @@ infrastructure`. La persistance des recettes et catalogues passe exclusivement
 par le MCP de `recipe`; l'extraction d'image passe exclusivement par le MCP de
 `ocr`. Seuls les `AgentRun` sont persistés localement par l'agent.
 
+Lorsque le MCP Recipe est protégé, l'agent obtient un jeton court par le flux
+OAuth `client_credentials`. Son client Keycloak ne reçoit que les scopes
+`recipes:read`, `recipes:write` et `recipes:image:generate`; le secret reste
+dans Vault et n'est jamais inscrit dans la configuration versionnée.
+
 Consulter [AGENTS.md](./AGENTS.md) pour le graphe LangGraph, les contrats et les
 règles de contribution.
 

@@ -10,6 +10,7 @@ from infrastructure.config import (
     LMConfig,
     LMSettings,
     MCPRegistrySettings,
+    OAuthClientCredentialsSettings,
     load_agent_config,
 )
 
@@ -42,6 +43,25 @@ def test_lm_settings_anthropic():
 def test_mcp_registry_settings():
     settings = MCPRegistrySettings(url = "http://my-server:8302/mcp")
     assert settings.url == "http://my-server:8302/mcp"
+    assert settings.oauth is None
+
+
+def test_mcp_registry_oauth_settings_hide_secret():
+    oauth = OAuthClientCredentialsSettings(
+        token_url = "http://keycloak/realms/rekipe/protocol/openid-connect/token",
+        client_id = "recipe-agent",
+        client_secret = "not-logged",
+    )
+    settings = MCPRegistrySettings(url = "http://recipe/mcp", oauth = oauth)
+
+    assert settings.oauth is not None
+    assert settings.oauth.client_secret.get_secret_value() == "not-logged"
+    assert "not-logged" not in repr(settings)
+    assert settings.oauth.scopes == [
+        "recipes:read",
+        "recipes:write",
+        "recipes:image:generate",
+    ]
 
 
 def test_fuzzy_settings_default():
