@@ -24,6 +24,8 @@ soft_delete:
 # ── Agent config ──────────────────────────────────────────────────────────────
 mcp_registry:
   url: http://127.0.0.1:8302/mcp  # URL du service Rekipe exposant les tools MCP
+  # En préproduction, le bloc OAuth client credentials est injecté par GitOps.
+  # Le secret reste dans Vault et n'est jamais versionné.
 ocr:
   url: http://127.0.0.1:8041/mcp
   timeout_seconds: 120

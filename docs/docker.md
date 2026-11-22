@@ -47,7 +47,22 @@ ou fournir via Vault / variable d'environnement :**
 - `lm.planner.api_key` — clé OpenAI (résolue par Vault via
   `config/secrets.yaml` ou injectée dans `OPENAI_API_KEY`)
 - `mcp_registry.url` — URL MCP du service `recipe` joignable depuis le conteneur
+- `mcp_registry.oauth` — en préproduction/production, URL du token Keycloak,
+  identifiant du client confidentiel et scopes MCP minimaux ; le champ
+  `client_secret` doit être résolu depuis Vault ou une variable d'environnement
 - `recipe_api.url` — URL HTTP du service `recipe` joignable depuis le conteneur
+
+Exemple pour un MCP Recipe protégé :
+
+```yaml
+mcp_registry:
+  url: http://rekipe-recipe-mcp:8001/mcp
+  oauth:
+    token_url: http://keycloak/realms/rekipe/protocol/openid-connect/token
+    client_id: rekipe-agent-recipe-creator
+    client_secret: ${RECIPE_MCP_CLIENT_SECRET}
+    scopes: [recipes:read, recipes:write, recipes:image:generate]
+```
 
 Chemin Vault attendu pour OpenAI :
 

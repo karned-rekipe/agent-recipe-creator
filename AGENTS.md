@@ -147,6 +147,12 @@ son UUID.
 ```yaml
 mcp_registry:
   url: http://127.0.0.1:8302/mcp    # URL du serveur MCP recipe/
+  # En environnement protégé, utiliser un client Keycloak confidentiel distinct.
+  # oauth:
+  #   token_url: http://keycloak/realms/rekipe/protocol/openid-connect/token
+  #   client_id: rekipe-agent-recipe-creator
+  #   client_secret: ${RECIPE_MCP_CLIENT_SECRET}
+  #   scopes: [recipes:read, recipes:write, recipes:image:generate]
 
 ocr:
   url: http://127.0.0.1:8041/mcp    # URL du serveur MCP ocr/

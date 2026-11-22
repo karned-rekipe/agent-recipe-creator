@@ -73,7 +73,16 @@ def _build_enrichment_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeReg
 class RecipeAgentAdapter(RecipeAgentPort):
     def __init__(self, config: AgentConfig) -> None:
         planner = _PydanticAIPlanner(config.lm.planner)
-        registry = _MCPRecipeRegistry(config.mcp_registry.url, config.recipe_api.url, config.recipe_api.tenant_uri)
+        oauth = config.mcp_registry.oauth
+        registry = _MCPRecipeRegistry(
+            config.mcp_registry.url,
+            config.recipe_api.url,
+            config.recipe_api.tenant_uri,
+            oauth_token_url=oauth.token_url if oauth else None,
+            oauth_client_id=oauth.client_id if oauth else None,
+            oauth_client_secret=oauth.client_secret.get_secret_value() if oauth else None,
+            oauth_scopes=oauth.scopes if oauth else None,
+        )
         matcher = _make_fuzzy_matcher(config.fuzzy.threshold)
         self._graph = _build_graph(planner, registry, matcher)
         self._enrichment_graph = _build_enrichment_graph(planner, registry, matcher)

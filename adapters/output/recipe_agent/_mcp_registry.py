@@ -1,9 +1,11 @@
+import asyncio
 import json
 import time
 from typing import Any
 
 import fastmcp
 from fastmcp.client.transports import StreamableHttpTransport
+import httpx
 from pydantic import BaseModel
 
 from adapters.output.recipe_agent._logger import log as logger
@@ -21,11 +23,75 @@ def _to_plain_data(value: Any) -> Any:
     return value
 
 
+class _ClientCredentialsTokenProvider:
+    def __init__(self, *, token_url: str, client_id: str, client_secret: str, scopes: list[str]) -> None:
+        self._token_url = token_url
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._scopes = scopes
+        self._access_token: str | None = None
+        self._expires_at = 0.0
+        self._lock = asyncio.Lock()
+
+    async def get_token(self) -> str:
+        if self._access_token is not None and time.monotonic() < self._expires_at:
+            return self._access_token
+        async with self._lock:
+            if self._access_token is not None and time.monotonic() < self._expires_at:
+                return self._access_token
+            await self._refresh()
+            if self._access_token is None:
+                raise RuntimeError("Keycloak did not return an OAuth access token")
+            return self._access_token
+
+    def invalidate(self) -> None:
+        self._access_token = None
+        self._expires_at = 0.0
+
+    async def _refresh(self) -> None:
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": self._client_id,
+            "client_secret": self._client_secret,
+        }
+        if self._scopes:
+            data["scope"] = " ".join(self._scopes)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(self._token_url, data=data)
+            response.raise_for_status()
+            payload = response.json()
+        token = payload.get("access_token")
+        if not isinstance(token, str) or not token:
+            raise RuntimeError("Keycloak did not return an OAuth access token")
+        expires_in = max(float(payload.get("expires_in", 60)), 1.0)
+        refresh_margin = min(30.0, expires_in / 10)
+        self._access_token = token
+        self._expires_at = time.monotonic() + max(expires_in - refresh_margin, 1.0)
+
+
 class _MCPRecipeRegistry:
-    def __init__(self, url: str, api_url: str, tenant_uri: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        api_url: str,
+        tenant_uri: str,
+        *,
+        oauth_token_url: str | None = None,
+        oauth_client_id: str | None = None,
+        oauth_client_secret: str | None = None,
+        oauth_scopes: list[str] | None = None,
+    ) -> None:
         self._mcp_url = url
         self._api_url = api_url.rstrip("/")
         self._tenant_uri = tenant_uri
+        self._token_provider = None
+        if oauth_token_url and oauth_client_id and oauth_client_secret:
+            self._token_provider = _ClientCredentialsTokenProvider(
+                token_url=oauth_token_url,
+                client_id=oauth_client_id,
+                client_secret=oauth_client_secret,
+                scopes=oauth_scopes or [],
+            )
 
     async def _call(self, tool_name: str, args: dict) -> Any:
         logger.debug(f"  → MCP {tool_name}({json.dumps(args, ensure_ascii = False)})")
@@ -48,9 +114,21 @@ class _MCPRecipeRegistry:
         return result
 
     async def _call_http(self, tool_name: str, args: dict) -> Any:
+        try:
+            return await self._call_http_once(tool_name, args)
+        except httpx.HTTPStatusError as exc:
+            if self._token_provider is None or exc.response.status_code != 401:
+                raise
+            self._token_provider.invalidate()
+            return await self._call_http_once(tool_name, args)
+
+    async def _call_http_once(self, tool_name: str, args: dict) -> Any:
+        headers = {"X-Tenant-URI": self._tenant_uri}
+        if self._token_provider is not None:
+            headers["Authorization"] = f"Bearer {await self._token_provider.get_token()}"
         transport = StreamableHttpTransport(
             self._mcp_url,
-            headers={"X-Tenant-URI": self._tenant_uri},
+            headers=headers,
         )
         async with fastmcp.Client(transport, timeout=120.0) as client:
             result = await client.call_tool(tool_name, args, timeout=120.0)
