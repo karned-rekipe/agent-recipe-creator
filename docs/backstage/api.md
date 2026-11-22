@@ -10,6 +10,9 @@ exclusive afin d'éviter les interprétations ambiguës.
 routes `agent-runs` permettent au frontend de reprendre un traitement en cours
 après navigation ou rafraîchissement.
 
+L'enrichissement sélectionne ses tags uniquement dans le catalogue exposé par
+Recipe et fusionne les UUID retenus avec les associations déjà présentes.
+
 Le MCP interne expose `ai_create_recipe` et `ai_enrich_recipe`. Il n'est pas
 publié par un Ingress tant qu'une protection équivalente à celle du MCP Recipe
 n'est pas disponible.

@@ -12,3 +12,8 @@ sont pas persistés par `ocr`.
 Les créations et enrichissements convergent vers le même `RecipePlan`. Le
 second passage de revue complète les métadonnées manquantes et recalcule les
 temps à partir des étapes avant l'écriture finale.
+
+Avant la planification, l'agent charge les tags existants depuis le MCP Recipe.
+Le plan choisit uniquement dans ce catalogue, puis un nœud de résolution
+rejette toute valeur inconnue et fusionne les UUID sélectionnés avec les tags
+humains de la fiche.

@@ -15,6 +15,7 @@ from adapters.output.recipe_agent._nodes import (
     make_plan_node,
     make_review_plan_node,
     make_resolve_ingredients_node,
+    make_resolve_tags_node,
     make_resolve_ustensils_node,
 )
 from domain.models.recipe import IngredientLine, RecipeComponentPlan, RecipePlan, RecipeStep, UstensilLine
@@ -27,10 +28,15 @@ class FakePlanner:
     def __init__(self, plan: RecipePlan) -> None:
         self._plan = plan
 
-    async def plan(self, user_input: str) -> RecipePlan:
+    async def plan(self, user_input: str, available_tags: list[str]) -> RecipePlan:
         return self._plan
 
-    async def review(self, raw_text: str, plan: RecipePlan) -> RecipePlan:
+    async def review(
+        self,
+        raw_text: str,
+        plan: RecipePlan,
+        available_tags: list[str],
+    ) -> RecipePlan:
         return plan
 
 
@@ -58,6 +64,12 @@ class FakeRegistry:
         item = {"uuid": f"ust-{name}", "name": name}
         self.created_ustensils.append(item)
         return item
+
+    async def list_tags(self) -> list[dict]:
+        return [
+            {"uuid": "tag-soupe", "name": "soupe"},
+            {"uuid": "tag-rapide", "name": "rapide"},
+        ]
 
     async def list_recipes(self, name: str) -> list[dict]:
         return []
@@ -132,6 +144,8 @@ def _base_state(**kwargs) -> dict:
         "plan": None,
         "resolved_ingredients": {},
         "resolved_ustensils": {},
+        "available_tags": [],
+        "resolved_tags": {},
         "resolved_components": [],
         "recipe_uuid": None,
         "recipe_exists": None,
@@ -153,7 +167,7 @@ def _make_plan(**kwargs) -> RecipePlan:
 
 async def test_plan_node_returns_plan():
     expected = _make_plan()
-    node = make_plan_node(FakePlanner(expected))
+    node = make_plan_node(FakePlanner(expected), FakeRegistry())
     state = _base_state(messages = [HumanMessage(content = "recette de beignets")])
     result = await node(state)
     assert result["plan"] is expected
@@ -163,11 +177,12 @@ async def test_plan_node_passes_message_content():
     received: list[str] = []
 
     class _CapturingPlanner:
-        async def plan(self, user_input: str) -> RecipePlan:
+        async def plan(self, user_input: str, available_tags: list[str]) -> RecipePlan:
             received.append(user_input)
+            assert available_tags == ["soupe", "rapide"]
             return _make_plan()
 
-    node = make_plan_node(_CapturingPlanner())
+    node = make_plan_node(_CapturingPlanner(), FakeRegistry())
     state = _base_state(messages = [HumanMessage(content = "ma recette spéciale")])
     await node(state)
     assert received == ["ma recette spéciale"]
@@ -178,13 +193,23 @@ async def test_review_plan_node_returns_reviewed_plan():
     reviewed = _make_plan(name = "Beignets validés", ingredients = [IngredientLine(name = "sucre")])
 
     class _ReviewingPlanner:
-        async def review(self, raw_text: str, plan: RecipePlan) -> RecipePlan:
+        async def review(
+            self,
+            raw_text: str,
+            plan: RecipePlan,
+            available_tags: list[str],
+        ) -> RecipePlan:
             assert raw_text == "recette brute"
             assert plan is initial
+            assert available_tags == ["soupe"]
             return reviewed
 
     node = make_review_plan_node(_ReviewingPlanner())
-    state = _base_state(plan = initial, messages = [HumanMessage(content = "recette brute")])
+    state = _base_state(
+        plan=initial,
+        messages=[HumanMessage(content="recette brute")],
+        available_tags=[{"uuid": "tag-soupe", "name": "soupe"}],
+    )
     result = await node(state)
 
     assert result["plan"] is reviewed
@@ -385,6 +410,24 @@ async def test_resolve_ustensils_keeps_parent_equipment_when_components_exist():
     assert result["resolved_ustensils"] == {"fouet": "ust-fouet"}
 
 
+async def test_resolve_tags_selects_only_existing_catalog_entries():
+    node = make_resolve_tags_node(_make_fuzzy_matcher(85))
+    state = _base_state(
+        plan=_make_plan(tags=["Soupe", "tag inventé", "GOÛTER"]),
+        available_tags=[
+            {"uuid": "tag-soupe", "name": "soupe"},
+            {"uuid": "tag-gouter", "name": "goûter"},
+        ],
+    )
+
+    result = await node(state)
+
+    assert result["resolved_tags"] == {
+        "soupe": "tag-soupe",
+        "goûter": "tag-gouter",
+    }
+
+
 # ── create_recipe node ─────────────────────────────────────────────────────────
 
 
@@ -406,6 +449,7 @@ async def test_create_recipe_stores_uuid():
     assert registry.created_recipes[0]["name"] == "Tarte Tatin"
     assert registry.created_recipes[0]["servings"] == 1
     assert registry.created_recipes[0]["ingredients"] == []
+    assert registry.created_recipes[0]["tag_uuids"] == []
     assert stages == ["saving"]
 
 

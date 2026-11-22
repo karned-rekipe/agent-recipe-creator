@@ -58,6 +58,7 @@ async def test_recipe_registry_call_and_public_wrappers(monkeypatch):
     await registry.get_recipe("id")
     await registry.update_recipe("id", {"name": "Cake"})
     await registry.generate_recipe_image("id")
+    await registry.list_tags()
     assert [name for name, _ in calls] == [
         "create_ingredient",
         "create_equipment",
@@ -65,6 +66,7 @@ async def test_recipe_registry_call_and_public_wrappers(monkeypatch):
         "get_recipe",
         "update_recipe",
         "generate_recipe_image",
+        "list_tags",
     ]
 
 

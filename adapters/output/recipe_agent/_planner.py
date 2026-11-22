@@ -40,6 +40,10 @@ _SYSTEM_PROMPT = (
     "Si l'origine, la difficulté ou le prix ne sont pas explicitement écrits, estime-les à partir du plat, "
     "des techniques, des ingrédients et du contexte. Utilise un code pays ISO alpha-2 et des scores de 1 à 5. "
     "Conserve les sources identifiables. La saison sera calculée par le registre depuis les ingrédients.\n\n"
+    "## Tags\n"
+    "Choisis uniquement les tags réellement pertinents dans le catalogue fourni avec la demande. "
+    "Recopie leur nom exactement, sans inventer ni reformuler de tag. "
+    "Un tag seulement vaguement lié à la recette doit être omis.\n\n"
     "## Description\n"
     "La description finale doit être un court résumé éditorial. N'y laisse aucune liste d'ingrédients ni étape : "
     "reclasse systématiquement ces éléments dans ingredients et steps.\n\n"
@@ -57,6 +61,7 @@ _REVIEW_PROMPT = (
     "- Retire de description les ingrédients et instructions qui y étaient mal rangés après les avoir reclassés.\n"
     "- Complète origin_country, difficulty et price lorsqu'ils sont absents, sans remplacer une valeur existante fournie.\n"
     "- Vérifie la ventilation des temps entre préparation, cuisson et repos pour permettre un total fiable.\n"
+    "- Conserve uniquement les tags pertinents qui appartiennent exactement au catalogue fourni.\n"
     "- Ne supprime pas une sous-recette utile.\n"
     "- Garde une réponse en français et ne renvoie que le JSON structuré."
 )
@@ -105,8 +110,8 @@ class _PydanticAIPlanner:
             retries=3,
         ))
 
-    async def plan(self, user_input: str) -> RecipePlan:
-        result = await self._agent.run(user_input)
+    async def plan(self, user_input: str, available_tags: list[str] | None = None) -> RecipePlan:
+        result = await self._agent.run(_with_tag_catalog(user_input, available_tags))
         self._log_messages(result)
         usage = result.usage()
         logger.debug(
@@ -115,12 +120,18 @@ class _PydanticAIPlanner:
         )
         return result.output
 
-    async def review(self, raw_text: str, plan: RecipePlan) -> RecipePlan:
+    async def review(
+        self,
+        raw_text: str,
+        plan: RecipePlan,
+        available_tags: list[str] | None = None,
+    ) -> RecipePlan:
         review_input = (
             "TEXTE BRUT:\n"
             f"{raw_text}\n\n"
             "RECETTE EXTRAITE JSON:\n"
-            f"{plan.model_dump_json()}"
+            f"{plan.model_dump_json()}\n\n"
+            f"CATALOGUE DE TAGS AUTORISÉS:\n{_format_tag_catalog(available_tags)}"
         )
         result = await self._review_agent.run(review_input)
         self._log_messages(result)
@@ -143,3 +154,17 @@ class _PydanticAIPlanner:
                         logger.debug(f"  LLM text: {part.content[:500]!r}")
                     case "ToolCallPart":
                         logger.debug(f"  LLM tool_call name={part.tool_name} args={str(part.args)[:300]}")
+
+
+def _format_tag_catalog(available_tags: list[str] | None) -> str:
+    if not available_tags:
+        return "(aucun tag disponible : retourne une liste vide)"
+    return "\n".join(f"- {name}" for name in available_tags)
+
+
+def _with_tag_catalog(user_input: str, available_tags: list[str] | None) -> str:
+    return (
+        f"{user_input}\n\n"
+        "CATALOGUE DE TAGS AUTORISÉS (choisir uniquement dans cette liste) :\n"
+        f"{_format_tag_catalog(available_tags)}"
+    )

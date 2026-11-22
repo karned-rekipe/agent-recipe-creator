@@ -75,6 +75,10 @@ class RecipePlan(BaseModel):
     difficulty: int | None = Field(default = None, ge = 1, le = 5, description = "Difficulté de 1 à 5")
     price: int | None = Field(default = None, ge = 1, le = 5, description = "Niveau de prix de 1 à 5")
     sources: list[RecipeSource] = Field(default_factory = list)
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Noms de tags pertinents choisis exclusivement dans le catalogue fourni",
+    )
     ingredients: list[IngredientLine] = Field(default_factory = list)
     ustensils: list[UstensilLine] = Field(default_factory = list)
     steps: list[RecipeStep] = Field(default_factory = list)

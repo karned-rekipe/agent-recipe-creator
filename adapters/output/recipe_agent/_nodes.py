@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 import re
 import time
@@ -20,7 +20,7 @@ async def _report_progress(state: RecipeAgentState, stage: RecipeProcessingStage
         await callback(stage)
 
 
-def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
+def make_plan_node(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry) -> Callable:
     async def plan_node(state: RecipeAgentState) -> dict:
         await _report_progress(state, "analyzing")
         user_message = state["messages"][-1].content
@@ -28,7 +28,11 @@ def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
         logger.info(f"▶ [plan] length={len(user_message)} content={user_message[:200]!r}")
         t0 = time.perf_counter()
 
-        plan = await planner.plan(user_message)
+        available_tags = await registry.list_tags()
+        plan = await planner.plan(
+            user_message,
+            [tag["name"] for tag in available_tags],
+        )
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
@@ -37,7 +41,7 @@ def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
             f"ingredients={len(plan.ingredients)} "
             f"ustensils={len(plan.ustensils)}"
         )
-        return {"plan": plan}
+        return {"plan": plan, "available_tags": available_tags}
 
     return plan_node
 
@@ -52,7 +56,11 @@ def make_review_plan_node(planner: _PydanticAIPlanner) -> Callable:
         logger.info(f"▶ [review_plan] name={plan.name!r}")
         t0 = time.perf_counter()
 
-        reviewed = await planner.review(user_message, plan)
+        reviewed = await planner.review(
+            user_message,
+            plan,
+            [tag["name"] for tag in state.get("available_tags", [])],
+        )
 
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info(
@@ -221,6 +229,25 @@ def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable)
     return resolve_ustensils_node
 
 
+def make_resolve_tags_node(matcher: Callable) -> Callable:
+    async def resolve_tags_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "tags")
+        plan = state["plan"]
+        assert plan is not None
+        candidates = state.get("available_tags", [])
+        resolved: dict[str, str] = {}
+        for tag_name in plan.tags:
+            match = matcher(tag_name, candidates)
+            if match and match["uuid"] not in resolved.values():
+                resolved[match["name"]] = match["uuid"]
+        logger.info(
+            f"◀ [resolve_tags] selected={list(resolved)} available={len(candidates)}"
+        )
+        return {"resolved_tags": resolved}
+
+    return resolve_tags_node
+
+
 def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_recipe_node(state: RecipeAgentState) -> dict:
         await _report_progress(state, "saving")
@@ -236,6 +263,7 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
             components=state["resolved_components"],
             include_ingredients=True,
             sources=state.get("input_sources", []),
+            tag_uuids=list(state.get("resolved_tags", {}).values()),
         )
         created = await registry.create_recipe(payload)
 
@@ -275,6 +303,10 @@ def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
             state["resolved_ustensils"],
             components=components,
             sources=sources,
+            tag_uuids=list(dict.fromkeys([
+                *(existing.get("tag_uuids") or []),
+                *state.get("resolved_tags", {}).values(),
+            ])),
         )
         existing_status = existing.get("status", "active")
         status = "active" if existing_status == "draft" and payload["ingredients"] else existing_status
@@ -291,7 +323,6 @@ def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
             "main_image": existing.get("main_image"),
             "secondary_images": existing.get("secondary_images") or [],
             "favorite": existing.get("favorite", False),
-            "tag_uuids": existing.get("tag_uuids") or [],
             "status": status,
             "quality_status": quality_status,
             "legacy_id": existing.get("legacy_id"),
@@ -439,6 +470,7 @@ def _build_recipe_payload(
         components: list[dict] | None = None,
         include_ingredients: bool = True,
         sources: list | None = None,
+        tag_uuids: Iterable[str] = (),
 ) -> dict:
     ingredients = []
     if include_ingredients:
@@ -481,6 +513,7 @@ def _build_recipe_payload(
         "difficulty": getattr(plan, "difficulty", None),
         "price": getattr(plan, "price", None),
         "sources": _merge_sources([*getattr(plan, "sources", []), *(sources or [])]),
+        "tag_uuids": list(tag_uuids),
     }
     if components:
         payload["components"] = components

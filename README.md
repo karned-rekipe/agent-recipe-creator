@@ -87,8 +87,13 @@ Le second tool renvoie l'UUID et le nom de la recette, les indicateurs
 Pendant une création ou une mise à niveau, l'`AgentRun` publie
 `metadata.current_stage` et `metadata.stage_history`. Les phases correspondent
 aux nœuds réellement exécutés : lecture, analyse, vérification, contrôle des
-doublons pour la création, organisation, résolution des ingrédients et
-ustensiles, sauvegarde puis traitement de l'image.
+doublons pour la création, organisation, résolution des ingrédients,
+ustensiles et tags existants, sauvegarde puis traitement de l'image.
+
+Le catalogue de tags est lu via le MCP Recipe avant l'analyse. Le LLM ne peut
+proposer que les noms fournis ; une seconde résolution déterministe ignore les
+valeurs inconnues. Pour une fiche existante, les tags détectés sont fusionnés
+avec les UUID déjà associés et ne les remplacent jamais.
 
 ## Validation
 
