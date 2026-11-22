@@ -3,7 +3,8 @@ from typing import Annotated, TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from domain.models.recipe import RecipePlan
+from domain.models.recipe import RecipePlan, RecipeSource
+from domain.ports.recipe_agent import RecipeProgressCallback
 
 
 class RecipeAgentState(TypedDict):
@@ -17,4 +18,11 @@ class RecipeAgentState(TypedDict):
     allow_duplicate: bool
     existing_recipe_uuid: str | None
     existing_recipe_name: str | None
+    existing_recipe: dict | None
+    target_recipe_uuid: str | None
+    input_sources: list[RecipeSource]
+    generate_image: bool
+    image_generated: bool
+    warnings: list[str]
     error: str | None
+    progress_callback: RecipeProgressCallback | None

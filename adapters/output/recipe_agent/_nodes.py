@@ -3,17 +3,26 @@ from collections.abc import Callable
 import re
 import time
 
+from adapters.output.recipe_agent._fuzzy import _lookup_variants
 from adapters.output.recipe_agent._logger import log as logger
 from adapters.output.recipe_agent._mcp_registry import _MCPRecipeRegistry
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
 from adapters.output.recipe_agent._state import RecipeAgentState
 from domain.models.recipe import RecipeComponentPlan, RecipePlan
+from domain.ports.recipe_agent import RecipeProcessingStage
 
 type RecipePlanLike = RecipePlan | RecipeComponentPlan
 
 
+async def _report_progress(state: RecipeAgentState, stage: RecipeProcessingStage) -> None:
+    callback = state.get("progress_callback")
+    if callback is not None:
+        await callback(stage)
+
+
 def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
     async def plan_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "analyzing")
         user_message = state["messages"][-1].content
         assert isinstance(user_message, str)
         logger.info(f"▶ [plan] length={len(user_message)} content={user_message[:200]!r}")
@@ -35,6 +44,7 @@ def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
 
 def make_review_plan_node(planner: _PydanticAIPlanner) -> Callable:
     async def review_plan_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "reviewing")
         plan = state["plan"]
         assert plan is not None
         user_message = state["messages"][0].content
@@ -57,6 +67,7 @@ def make_review_plan_node(planner: _PydanticAIPlanner) -> Callable:
 
 def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def check_recipe_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "checking_duplicate")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [check_recipe] name={plan.name!r}")
@@ -100,8 +111,15 @@ async def _resolve_ingredients_for_plan(
 ) -> dict[str, str]:
     resolved: dict[str, str] = {}
     for line in plan.ingredients:
-        candidates = await registry.list_ingredients(line.name)
-        match = matcher(line.name, candidates)
+        candidates: list[dict] = []
+        match = None
+        for lookup_name in _lookup_variants(line.name):
+            found = await registry.list_ingredients(lookup_name)
+            known_uuids = {candidate["uuid"] for candidate in candidates}
+            candidates.extend(candidate for candidate in found if candidate["uuid"] not in known_uuids)
+            match = matcher(line.name, candidates)
+            if match:
+                break
         if match:
             logger.info(f"  ♻️  reuse ingredient name={line.name!r} uuid={match['uuid']}")
             resolved[line.name] = match["uuid"]
@@ -133,6 +151,7 @@ async def _resolve_ustensils_for_plan(
 
 def make_create_components_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def create_components_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "organizing")
         plan = state["plan"]
         assert plan is not None
         if not plan.components:
@@ -172,6 +191,7 @@ def make_create_components_node(registry: _MCPRecipeRegistry, matcher: Callable)
 
 def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ingredients_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "ingredients")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [resolve_ingredients] {len(plan.ingredients)} ingredient(s)")
@@ -187,6 +207,7 @@ def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callabl
 
 def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ustensils_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "equipment")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [resolve_ustensils] {len(plan.ustensils)} ustensil(s)")
@@ -202,6 +223,7 @@ def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable)
 
 def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
     async def create_recipe_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "saving")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [create_recipe] name={plan.name!r}")
@@ -213,6 +235,7 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
             state["resolved_ustensils"],
             components=state["resolved_components"],
             include_ingredients=True,
+            sources=state.get("input_sources", []),
         )
         created = await registry.create_recipe(payload)
 
@@ -225,6 +248,89 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
         }
 
     return create_recipe_node
+
+
+def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
+    async def update_recipe_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "saving")
+        plan = state["plan"]
+        existing = state["existing_recipe"]
+        recipe_uuid = state["target_recipe_uuid"]
+        assert plan is not None and existing is not None and recipe_uuid is not None
+
+        components = state["resolved_components"] or [
+            {
+                "uuid": component.get("uuid"),
+                "recipe_uuid": component["recipe_uuid"],
+                "label": component["label"],
+                "rank": component["rank"],
+                "servings_multiplier": component.get("servings_multiplier", 1.0),
+            }
+            for component in existing.get("components", [])
+        ]
+        sources = [*existing.get("sources", []), *state["input_sources"]]
+        payload = _build_recipe_payload(
+            plan,
+            state["resolved_ingredients"],
+            state["resolved_ustensils"],
+            components=components,
+            sources=sources,
+        )
+        existing_status = existing.get("status", "active")
+        status = "active" if existing_status == "draft" and payload["ingredients"] else existing_status
+        existing_quality = existing.get("quality_status", "structured")
+        quality_status = (
+            "structured"
+            if existing_quality in {"minimal", "text_only"} and payload["ingredients"] and payload["steps"]
+            else existing_quality
+        )
+        payload.update({
+            "origin_country": existing.get("origin_country") or plan.origin_country,
+            "difficulty": existing.get("difficulty") or plan.difficulty,
+            "price": existing.get("price") or plan.price,
+            "main_image": existing.get("main_image"),
+            "secondary_images": existing.get("secondary_images") or [],
+            "favorite": existing.get("favorite", False),
+            "tag_uuids": existing.get("tag_uuids") or [],
+            "status": status,
+            "quality_status": quality_status,
+            "legacy_id": existing.get("legacy_id"),
+            "created_at_legacy": existing.get("created_at_legacy"),
+            "updated_at_legacy": existing.get("updated_at_legacy"),
+            "migration_metadata": existing.get("migration_metadata") or {},
+        })
+        updated = await registry.update_recipe(recipe_uuid, payload)
+        content = _format_response(plan, recipe_uuid, state["resolved_ingredients"], state["resolved_ustensils"])
+        content = content.replace("créée avec succès", "mise à niveau avec succès", 1)
+        return {
+            "recipe_uuid": updated["uuid"],
+            "messages": [{"role": "assistant", "content": content}],
+        }
+
+    return update_recipe_node
+
+
+def make_generate_image_node(registry: _MCPRecipeRegistry) -> Callable:
+    async def generate_image_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "image")
+        if not state["generate_image"]:
+            return {"image_generated": False}
+        existing = state["existing_recipe"]
+        if existing and existing.get("main_image"):
+            return {"image_generated": False}
+        recipe_uuid = state["recipe_uuid"]
+        assert recipe_uuid is not None
+        try:
+            await registry.generate_recipe_image(recipe_uuid)
+        except Exception as exc:
+            logger.warning(f"⚠️ [generate_image] recipe={recipe_uuid} error={exc}")
+            return {
+                "image_generated": False,
+                "warnings": [f"La recette a été enregistrée, mais la génération d'image a échoué : {exc}"],
+            }
+        return {"image_generated": True}
+
+    return generate_image_node
 
 
 def make_link_ingredients_node(registry: _MCPRecipeRegistry) -> Callable:
@@ -332,6 +438,7 @@ def _build_recipe_payload(
         resolved_ustensils: dict[str, str],
         components: list[dict] | None = None,
         include_ingredients: bool = True,
+        sources: list | None = None,
 ) -> dict:
     ingredients = []
     if include_ingredients:
@@ -354,7 +461,9 @@ def _build_recipe_payload(
         {
             "name": step.title.strip(),
             "description": step.instruction.strip() if step.instruction else None,
-            "preparation_time": step.duration_minutes,
+            "preparation_time": step.preparation_minutes,
+            "cooking_time": step.cooking_minutes,
+            "rest_time": step.rest_minutes,
             "rank": rank,
         }
         for rank, step in enumerate(plan.steps, 1)
@@ -368,10 +477,34 @@ def _build_recipe_payload(
         "ingredients": ingredients,
         "equipment": equipment,
         "steps": steps,
+        "origin_country": getattr(plan, "origin_country", None),
+        "difficulty": getattr(plan, "difficulty", None),
+        "price": getattr(plan, "price", None),
+        "sources": _merge_sources([*getattr(plan, "sources", []), *(sources or [])]),
     }
     if components:
         payload["components"] = components
     return payload
+
+
+def _merge_sources(sources: list) -> list[dict]:
+    merged: list[dict] = []
+    seen: set[tuple[str, str | None]] = set()
+    for source in sources:
+        data = source.model_dump(mode="json") if hasattr(source, "model_dump") else dict(source)
+        name = str(data.get("name") or "Source")
+        description = data.get("description") if isinstance(data.get("description"), str) else None
+        uri = data.get("uri") if isinstance(data.get("uri"), str) else None
+        clean = {
+            "name": name,
+            "description": description,
+            "uri": uri,
+        }
+        key = (name, uri)
+        if key not in seen:
+            seen.add(key)
+            merged.append(clean)
+    return merged
 
 
 def _format_plan_meta(plan: RecipePlan) -> list[str]:
@@ -403,7 +536,7 @@ def _format_plan_steps(plan: RecipePlan) -> list[str]:
         return lines
     lines.append("\n## 📋 Étapes")
     for i, step in enumerate(plan.steps, 1):
-        duration = f" _{step.duration_minutes} min_" if step.duration_minutes else ""
+        duration = f" _{step.total_minutes} min_" if step.total_minutes else ""
         lines.append(f"\n**{i}. {step.title}**{duration}")
         lines.append(step.instruction)
     return lines

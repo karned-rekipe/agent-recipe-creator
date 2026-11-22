@@ -22,6 +22,20 @@ def test_fuzzy_match_above_threshold():
     assert result["uuid"] == "u-1"
 
 
+def test_normalizes_accents_and_ligatures():
+    matcher = _make_fuzzy_matcher(100)
+    candidates = [{"uuid": "u-1", "name": "Œuf à la crème brûlée"}]
+    result = matcher("oeuf a la creme brulee", candidates)
+    assert result is not None
+    assert result["uuid"] == "u-1"
+
+
+def test_does_not_match_short_name_inside_different_ingredient():
+    matcher = _make_fuzzy_matcher(80)
+    candidates = [{"uuid": "u-1", "name": "nouilles aux œufs fraîches"}]
+    assert matcher("œufs", candidates) is None
+
+
 def test_no_match_below_threshold():
     matcher = _make_fuzzy_matcher(99)
     candidates = [{"uuid": "u-1", "name": "farine de blé"}]

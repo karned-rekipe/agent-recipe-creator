@@ -7,15 +7,17 @@ from adapters.output.recipe_agent._nodes import (
     make_check_recipe_node,
     make_create_components_node,
     make_create_recipe_node,
+    make_generate_image_node,
     make_plan_node,
     make_review_plan_node,
     make_resolve_ingredients_node,
     make_resolve_ustensils_node,
+    make_update_recipe_node,
 )
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
 from adapters.output.recipe_agent._state import RecipeAgentState
-from domain.models.recipe import RecipeResult
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.models.recipe import RecipeResult, RecipeSource
+from domain.ports.recipe_agent import RecipeAgentPort, RecipeProgressCallback
 from infrastructure.config import AgentConfig
 
 
@@ -33,6 +35,7 @@ def _build_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry, matc
     g.add_node("resolve_ingredients", make_resolve_ingredients_node(registry, matcher))
     g.add_node("resolve_ustensils", make_resolve_ustensils_node(registry, matcher))
     g.add_node("create_recipe", make_create_recipe_node(registry))
+    g.add_node("generate_image", make_generate_image_node(registry))
 
     g.set_entry_point("plan")
     g.add_edge("plan", "review_plan")
@@ -41,8 +44,29 @@ def _build_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry, matc
     g.add_edge("create_components", "resolve_ingredients")
     g.add_edge("resolve_ingredients", "resolve_ustensils")
     g.add_edge("resolve_ustensils", "create_recipe")
-    g.add_edge("create_recipe", END)
+    g.add_edge("create_recipe", "generate_image")
+    g.add_edge("generate_image", END)
 
+    return g.compile()
+
+
+def _build_enrichment_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry, matcher):
+    g = StateGraph(RecipeAgentState)
+    g.add_node("plan", make_plan_node(planner))
+    g.add_node("review_plan", make_review_plan_node(planner))
+    g.add_node("create_components", make_create_components_node(registry, matcher))
+    g.add_node("resolve_ingredients", make_resolve_ingredients_node(registry, matcher))
+    g.add_node("resolve_ustensils", make_resolve_ustensils_node(registry, matcher))
+    g.add_node("update_recipe", make_update_recipe_node(registry))
+    g.add_node("generate_image", make_generate_image_node(registry))
+    g.set_entry_point("plan")
+    g.add_edge("plan", "review_plan")
+    g.add_edge("review_plan", "create_components")
+    g.add_edge("create_components", "resolve_ingredients")
+    g.add_edge("resolve_ingredients", "resolve_ustensils")
+    g.add_edge("resolve_ustensils", "update_recipe")
+    g.add_edge("update_recipe", "generate_image")
+    g.add_edge("generate_image", END)
     return g.compile()
 
 
@@ -52,6 +76,8 @@ class RecipeAgentAdapter(RecipeAgentPort):
         registry = _MCPRecipeRegistry(config.mcp_registry.url, config.recipe_api.url, config.recipe_api.tenant_uri)
         matcher = _make_fuzzy_matcher(config.fuzzy.threshold)
         self._graph = _build_graph(planner, registry, matcher)
+        self._enrichment_graph = _build_enrichment_graph(planner, registry, matcher)
+        self._registry = registry
 
     async def process(
             self,
@@ -59,6 +85,9 @@ class RecipeAgentAdapter(RecipeAgentPort):
             run_uuid: str,
             *,
             allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
+            progress_callback: RecipeProgressCallback | None = None,
     ) -> RecipeResult:
         initial_state: RecipeAgentState = {
             "messages": [HumanMessage(content = raw_text)],
@@ -71,7 +100,14 @@ class RecipeAgentAdapter(RecipeAgentPort):
             "allow_duplicate": allow_duplicate,
             "existing_recipe_uuid": None,
             "existing_recipe_name": None,
+            "existing_recipe": None,
+            "target_recipe_uuid": None,
+            "input_sources": sources or [],
+            "generate_image": generate_image,
+            "image_generated": False,
+            "warnings": [],
             "error": None,
+            "progress_callback": progress_callback,
         }
         result = await self._graph.ainvoke(initial_state)
         last_message = result["messages"][-1]
@@ -88,4 +124,60 @@ class RecipeAgentAdapter(RecipeAgentPort):
             duplicate_confirmation_required = duplicate_confirmation_required,
             existing_recipe_uuid = result["existing_recipe_uuid"],
             existing_recipe_name = result["existing_recipe_name"],
+            image_generated=result["image_generated"],
+            warnings=result["warnings"],
+        )
+
+    async def enrich(
+        self,
+        recipe_uuid: str,
+        run_uuid: str,
+        *,
+        generate_image: bool = True,
+        progress_callback: RecipeProgressCallback | None = None,
+    ) -> RecipeResult:
+        import json
+
+        if progress_callback is not None:
+            await progress_callback("loading_recipe")
+        existing = await self._registry.get_recipe(recipe_uuid)
+        if existing is None:
+            raise KeyError(f"Recipe with uuid {recipe_uuid} not found")
+        raw_text = (
+            "Mets à niveau cette fiche existante. Préserve les données structurées correctes, complète les métadonnées "
+            "absentes et reclasse les ingrédients/étapes présents dans la description.\n\n"
+            f"FICHE EXISTANTE JSON:\n{json.dumps(existing, ensure_ascii=False)}"
+        )
+        initial_state: RecipeAgentState = {
+            "messages": [HumanMessage(content=raw_text)],
+            "plan": None,
+            "resolved_ingredients": {},
+            "resolved_ustensils": {},
+            "resolved_components": [],
+            "recipe_uuid": recipe_uuid,
+            "recipe_exists": False,
+            "allow_duplicate": False,
+            "existing_recipe_uuid": recipe_uuid,
+            "existing_recipe_name": existing.get("name"),
+            "existing_recipe": existing,
+            "target_recipe_uuid": recipe_uuid,
+            "input_sources": [],
+            "generate_image": generate_image,
+            "image_generated": False,
+            "warnings": [],
+            "error": None,
+            "progress_callback": progress_callback,
+        }
+        result = await self._enrichment_graph.ainvoke(initial_state)
+        last_message = result["messages"][-1]
+        return RecipeResult(
+            recipe_uuid=recipe_uuid,
+            recipe_name=result["plan"].name,
+            resolved_ingredients=result["resolved_ingredients"],
+            resolved_ustensils=result["resolved_ustensils"],
+            formatted_response=last_message.content if hasattr(last_message, "content") else str(last_message),
+            created=False,
+            updated=True,
+            image_generated=result["image_generated"],
+            warnings=result["warnings"],
         )

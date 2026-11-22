@@ -1,0 +1,96 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: rekipe-agent-recipe-creator
+  title: Agent de création de recettes Rekipe
+  description: Transforme texte, page Web, image ou PDF en recette structurée et enrichit les fiches existantes.
+  annotations:
+    github.com/project-slug: karned-rekipe/agent-recipe-creator
+    backstage.io/kubernetes-id: rekipe-agent-recipe-creator
+    backstage.io/kubernetes-namespace: rekipe
+    backstage.io/source-location: url:https://github.com/karned-rekipe/agent-recipe-creator/tree/main/
+    backstage.io/techdocs-ref: dir:.
+  tags: [agent, arclith, fastapi, fastmcp, langgraph, python]
+  links:
+    - url: https://rekipe.amazone.lan/api/recipe-agent/docs
+      title: OpenAPI préproduction
+      icon: web
+    - url: https://github.com/karned-rekipe/agent-recipe-creator
+      title: Dépôt applicatif
+      icon: github
+    - url: https://github.com/killiankopp/amazone-gitops-karned/tree/main/applications/rekipe
+      title: Déploiement GitOps
+      icon: github
+spec:
+  type: service
+  lifecycle: production
+  owner: user:default/skit
+  system: system:default/rekipe
+  providesApis:
+    - api:default/rekipe-agent-http
+    - api:default/rekipe-agent-mcp
+  consumesApis:
+    - api:default/rekipe-recipe-http
+    - api:default/rekipe-recipe-mcp
+    - api:default/rekipe-ocr-mcp
+  dependsOn:
+    - resource:default/rekipe-agent-mongodb
+    - resource:default/rekipe-openai
+    - resource:default/kamazone-cluster
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: rekipe-agent-http
+  title: Rekipe Recipe Agent REST API
+  description: Création multisource, enrichissement en place et suivi des traitements IA.
+  tags: [agent, fastapi, openapi, recipes]
+spec:
+  type: openapi
+  lifecycle: production
+  owner: user:default/skit
+  system: system:default/rekipe
+  definition: |
+    openapi: 3.1.0
+    info: {title: Rekipe Recipe Agent REST API, version: 0.2.0}
+    servers:
+      - {url: https://rekipe.amazone.lan/api/recipe-agent, description: Préproduction privée}
+    paths:
+      /v1/recipes/ai-create:
+        post:
+          summary: Créer une recette depuis du texte, une URL ou un document
+          responses: {"201": {description: Recette créée}, "200": {description: Doublon ou résultat existant}, "422": {description: Entrée invalide}}
+      /v1/recipes/{recipe_uuid}/ai-enrich:
+        post:
+          summary: Reclasser et enrichir une fiche existante
+          parameters: [{name: recipe_uuid, in: path, required: true, schema: {type: string, format: uuid}}]
+          responses: {"200": {description: Recette enrichie}, "404": {description: Recette inconnue}}
+      /v1/agent-runs/recipes/{recipe_uuid}/running:
+        get:
+          summary: Lire la progression active d'un enrichissement
+          parameters: [{name: recipe_uuid, in: path, required: true, schema: {type: string, format: uuid}}]
+          responses: {"200": {description: AgentRun}, "404": {description: Aucun traitement actif}}
+      /v1/agent-runs/creations/{tracking_id}/running:
+        get:
+          summary: Lire la progression active d'une création
+          parameters: [{name: tracking_id, in: path, required: true, schema: {type: string}}]
+          responses: {"200": {description: AgentRun}, "404": {description: Aucun traitement actif}}
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: rekipe-agent-mcp
+  title: Rekipe Recipe Agent MCP
+  description: Outils internes de création et d'enrichissement IA de recettes.
+  tags: [agent, fastmcp, mcp, recipes]
+spec:
+  type: mcp
+  lifecycle: production
+  owner: user:default/skit
+  system: system:default/rekipe
+  definition: |
+    transport: streamable-http
+    endpoint: http://rekipe-agent-recipe-creator-mcp.rekipe.svc.cluster.local:8004/mcp
+    visibility: cluster-internal
+    authentication: trusted namespace traffic; no public ingress
+    tools: [ai_create_recipe, ai_enrich_recipe]

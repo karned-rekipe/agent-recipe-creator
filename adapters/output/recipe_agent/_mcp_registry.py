@@ -2,9 +2,23 @@ import json
 import time
 from typing import Any
 
-import httpx
+import fastmcp
+from fastmcp.client.transports import StreamableHttpTransport
+from pydantic import BaseModel
 
 from adapters.output.recipe_agent._logger import log as logger
+
+
+def _to_plain_data(value: Any) -> Any:
+    """Convert FastMCP generated Pydantic result models into plain data."""
+
+    if isinstance(value, BaseModel):
+        return _to_plain_data(value.model_dump(mode="json"))
+    if isinstance(value, dict):
+        return {key: _to_plain_data(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_plain_data(item) for item in value]
+    return value
 
 
 class _MCPRecipeRegistry:
@@ -34,46 +48,23 @@ class _MCPRecipeRegistry:
         return result
 
     async def _call_http(self, tool_name: str, args: dict) -> Any:
-        headers = {"X-Tenant-URI": self._tenant_uri}
-        async with httpx.AsyncClient(base_url=self._api_url, timeout=30.0, headers=headers) as client:
-            match tool_name:
-                case "list_ingredients":
-                    return await self._get_page(client, "/v1/ingredients/", {"name": args["name"]})
-                case "create_ingredient":
-                    return await self._post_representation(
-                        client,
-                        "/v1/ingredients/",
-                        {"name": args["name"], "unit": args.get("unit")},
-                    )
-                case "list_equipment":
-                    return await self._get_page(client, "/v1/equipment/", {"name": args["name"]})
-                case "create_equipment":
-                    return await self._post_representation(client, "/v1/equipment/", {"name": args["name"]})
-                case "list_recipes":
-                    return await self._get_page(client, "/v1/recipes/", {"name": args["name"]})
-                case "create_recipe":
-                    return await self._post_representation(client, "/v1/recipes/", args["payload"])
-                case _:
-                    raise ValueError(
-                        f"Recipe registry operation '{tool_name}' is not supported by the HTTP adapter "
-                        f"(MCP URL configured: {self._mcp_url})"
-                    )
-
-    @staticmethod
-    async def _get_page(client: httpx.AsyncClient, path: str, params: dict[str, Any]) -> list[dict]:
-        response = await client.get(path, params={**params, "page": 1, "per_page": 50})
-        response.raise_for_status()
-        payload = response.json()
-        return payload.get("data") or []
-
-    @staticmethod
-    async def _post_representation(client: httpx.AsyncClient, path: str, payload: dict[str, Any]) -> dict:
-        response = await client.post(path, json=payload, headers={"Prefer": "return=representation"})
-        response.raise_for_status()
-        data = response.json().get("data")
-        if not isinstance(data, dict):
-            raise ValueError(f"Invalid response from {path}: expected object data")
-        return data
+        transport = StreamableHttpTransport(
+            self._mcp_url,
+            headers={"X-Tenant-URI": self._tenant_uri},
+        )
+        async with fastmcp.Client(transport, timeout=120.0) as client:
+            result = await client.call_tool(tool_name, args, timeout=120.0)
+        if result.structured_content:
+            if set(result.structured_content) == {"result"}:
+                return result.structured_content["result"]
+            return result.structured_content
+        for block in result.content:
+            text = getattr(block, "text", None)
+            if text:
+                return json.loads(text)
+        if result.data is not None:
+            return _to_plain_data(result.data)
+        return None
 
     # ── Ingredients ───────────────────────────────────────────────────────────
 
@@ -123,11 +114,13 @@ class _MCPRecipeRegistry:
     async def get_recipe(self, uuid: str) -> dict | None:
         return await self._call("get_recipe", {"uuid": uuid})
 
-    async def update_recipe(
-            self, uuid: str, name: str, description: str | None, nutriscore: str | None = None
-    ) -> dict:
+    async def update_recipe(self, uuid: str, payload: dict) -> dict:
+        return await self._call("update_recipe", {"uuid": uuid, "payload": payload})
+
+    async def generate_recipe_image(self, uuid: str) -> dict:
         return await self._call(
-            "update_recipe", {"uuid": uuid, "name": name, "description": description, "nutriscore": nutriscore}
+            "generate_recipe_image",
+            {"uuid": uuid, "prompt": None, "replace_existing": False},
         )
 
     async def delete_recipe(self, uuid: str) -> None:

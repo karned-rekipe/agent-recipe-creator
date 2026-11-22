@@ -18,6 +18,22 @@ def test_ai_create_request_accepts_allow_duplicate():
     assert schema.allow_duplicate is True
 
 
+def test_ai_create_request_accepts_safe_tracking_id():
+    schema = AiCreateRequestSchema(
+        raw_text="Voici une longue recette de gâteau au chocolat",
+        tracking_id="recipe-create-123_abcd",
+    )
+    assert schema.tracking_id == "recipe-create-123_abcd"
+
+
+def test_ai_create_request_rejects_unsafe_tracking_id():
+    with pytest.raises(ValidationError):
+        AiCreateRequestSchema(
+            raw_text="Voici une longue recette de gâteau au chocolat",
+            tracking_id="tracking id with spaces",
+        )
+
+
 def test_ai_create_request_too_short():
     with pytest.raises(ValidationError):
         AiCreateRequestSchema(raw_text = "court")

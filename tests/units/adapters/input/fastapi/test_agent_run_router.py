@@ -56,3 +56,51 @@ async def test_get_run_not_found_raises_404():
         await router.get_run(_uuid.UUID("00000000-0000-0000-0000-000000000000"))
     assert exc_info.value.status_code == 404
     assert "not found" in exc_info.value.detail.lower()
+
+
+async def test_get_running_recipe_enrichment():
+    service = _make_service()
+    run = await service.create(AgentRun(
+        raw_input="existing-recipe:recipe-1",
+        status="running",
+        metadata={"current_stage": "ingredients"},
+    ))
+    router = AgentRunRouter(service, NullLogger())
+
+    result = await router.get_running_recipe_enrichment("recipe-1")
+
+    assert str(result.uuid) == str(run.uuid)
+    assert result.metadata["current_stage"] == "ingredients"
+
+
+async def test_get_running_recipe_enrichment_returns_404_when_idle():
+    router = AgentRunRouter(_make_service(), NullLogger())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await router.get_running_recipe_enrichment("recipe-1")
+
+    assert exc_info.value.status_code == 404
+
+
+async def test_get_running_recipe_creation():
+    service = _make_service()
+    run = await service.create(AgentRun(
+        raw_input="recipe-image-upload:application/pdf",
+        status="running",
+        metadata={"tracking_id": "create-123", "current_stage": "reviewing"},
+    ))
+    router = AgentRunRouter(service, NullLogger())
+
+    result = await router.get_running_recipe_creation("create-123")
+
+    assert str(result.uuid) == str(run.uuid)
+    assert result.metadata["current_stage"] == "reviewing"
+
+
+async def test_get_running_recipe_creation_returns_404_when_idle():
+    router = AgentRunRouter(_make_service(), NullLogger())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await router.get_running_recipe_creation("missing")
+
+    assert exc_info.value.status_code == 404

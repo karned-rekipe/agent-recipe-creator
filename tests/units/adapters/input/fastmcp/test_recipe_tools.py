@@ -16,7 +16,7 @@ async def test_recipe_mcp_registers_tool():
     mcp = _make_mcp()
     RecipeMCP(MagicMock(), MagicMock(), mcp)
     tools = await mcp.list_tools()
-    assert any(t.name == "ai_create_recipe" for t in tools)
+    assert {tool.name for tool in tools} >= {"ai_create_recipe", "ai_enrich_recipe"}
 
 
 async def test_ai_create_recipe_success():
@@ -65,3 +65,41 @@ async def test_ai_create_recipe_raises_on_error():
 
     with pytest.raises(ToolError, match="LLM down"):
         await mcp.call_tool("ai_create_recipe", {"raw_text": "some recipe"})
+
+
+async def test_ai_enrich_recipe_success():
+    mcp = _make_mcp()
+    service = MagicMock()
+    service.ai_enrich = AsyncMock(return_value=RecipeResult(
+        recipe_uuid="recipe-1",
+        recipe_name="Pastilla",
+        resolved_ingredients={},
+        resolved_ustensils={},
+        formatted_response="mise à niveau",
+        created=False,
+        updated=True,
+        image_generated=True,
+        warnings=["avertissement"],
+    ))
+    RecipeMCP(service, MagicMock(), mcp)
+
+    result = await mcp.call_tool(
+        "ai_enrich_recipe",
+        {"recipe_uuid": "recipe-1", "generate_image": False},
+    )
+
+    assert result.structured_content["recipe_uuid"] == "recipe-1"
+    assert result.structured_content["updated"] is True
+    assert result.structured_content["image_generated"] is True
+    assert result.structured_content["warnings"] == ["avertissement"]
+    service.ai_enrich.assert_awaited_once_with("recipe-1", generate_image=False)
+
+
+async def test_ai_enrich_recipe_raises_on_error():
+    mcp = _make_mcp()
+    service = MagicMock()
+    service.ai_enrich = AsyncMock(side_effect=RuntimeError("planner down"))
+    RecipeMCP(service, MagicMock(), mcp)
+
+    with pytest.raises(ToolError, match="planner down"):
+        await mcp.call_tool("ai_enrich_recipe", {"recipe_uuid": "recipe-1"})

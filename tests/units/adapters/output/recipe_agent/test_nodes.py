@@ -1,5 +1,6 @@
 from langchain_core.messages import HumanMessage
 
+from adapters.output.recipe_agent._fuzzy import _make_fuzzy_matcher
 from adapters.output.recipe_agent._nodes import (
     _parse_positive_float,
     _unit_from_quantity,
@@ -83,6 +84,20 @@ class FakeRegistry:
 class FakeRegistryWithExistingIngredient(FakeRegistry):
     async def list_ingredients(self, name: str) -> list[dict]:
         return [{"uuid": "existing-ing", "name": name}]
+
+
+class FakeRegistryWithSingularIngredient(FakeRegistry):
+    def __init__(self) -> None:
+        super().__init__()
+        self.ingredient_queries: list[str] = []
+
+    async def list_ingredients(self, name: str) -> list[dict]:
+        self.ingredient_queries.append(name)
+        if name == "œufs":
+            return [{"uuid": "noodles", "name": "nouilles aux œufs fraîches"}]
+        if name == "oeuf":
+            return [{"uuid": "egg", "name": "oeuf"}]
+        return []
 
 
 class FakeRegistryWithExistingUstensil(FakeRegistry):
@@ -181,9 +196,15 @@ async def test_review_plan_node_returns_reviewed_plan():
 async def test_check_recipe_not_found():
     registry = FakeRegistry()
     node = make_check_recipe_node(registry, _no_match)
-    state = _base_state(plan = _make_plan())
+    stages: list[str] = []
+
+    async def report(stage: str) -> None:
+        stages.append(stage)
+
+    state = _base_state(plan = _make_plan(), progress_callback=report)
     result = await node(state)
     assert result["recipe_exists"] is False
+    assert stages == ["checking_duplicate"]
 
 
 async def test_check_recipe_found():
@@ -230,6 +251,17 @@ async def test_resolve_ingredients_reuses_existing():
     result = await node(state)
     assert result["resolved_ingredients"]["farine"] == "existing-ing"
     assert len(registry.created_ingredients) == 0
+
+
+async def test_resolve_ingredients_rejects_substring_and_retries_singular_name():
+    registry = FakeRegistryWithSingularIngredient()
+    node = make_resolve_ingredients_node(registry, _make_fuzzy_matcher(80))
+    plan = _make_plan(ingredients = [IngredientLine(name = "œufs", unit = "pièce", quantity = "4")])
+    result = await node(_base_state(plan = plan))
+
+    assert result["resolved_ingredients"]["œufs"] == "egg"
+    assert registry.ingredient_queries == ["œufs", "oeufs", "oeuf"]
+    assert registry.created_ingredients == []
 
 
 async def test_resolve_ingredients_multiple():
@@ -359,13 +391,22 @@ async def test_resolve_ustensils_keeps_parent_equipment_when_components_exist():
 async def test_create_recipe_stores_uuid():
     registry = FakeRegistry()
     node = make_create_recipe_node(registry)
-    state = _base_state(plan = _make_plan(name = "Tarte Tatin", description = "Tarte aux pommes caramélisées"))
+    stages: list[str] = []
+
+    async def report(stage: str) -> None:
+        stages.append(stage)
+
+    state = _base_state(
+        plan=_make_plan(name="Tarte Tatin", description="Tarte aux pommes caramélisées"),
+        progress_callback=report,
+    )
     result = await node(state)
     assert result["recipe_uuid"] == "recipe-uuid"
     assert len(registry.created_recipes) == 1
     assert registry.created_recipes[0]["name"] == "Tarte Tatin"
     assert registry.created_recipes[0]["servings"] == 1
     assert registry.created_recipes[0]["ingredients"] == []
+    assert stages == ["saving"]
 
 
 def test_parse_mixed_fraction_and_its_unit():

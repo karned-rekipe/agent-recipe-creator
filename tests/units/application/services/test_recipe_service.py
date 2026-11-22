@@ -2,7 +2,7 @@ from application.services.recipe_service import RecipeService
 from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun
-from domain.models.recipe import RecipeResult
+from domain.models.recipe import RecipeResult, RecipeSource
 from domain.ports.recipe_agent import RecipeAgentPort
 from tests.units.conftest import NullLogger
 
@@ -17,6 +17,9 @@ class _StubAgent(RecipeAgentPort):
             run_uuid: str,
             *,
             allow_duplicate: bool = False,
+            sources: list[RecipeSource] | None = None,
+            generate_image: bool = True,
+            progress_callback=None,
     ) -> RecipeResult:
         return self._result
 
@@ -48,6 +51,9 @@ async def test_ai_create_passes_raw_text_to_agent():
                 run_uuid: str,
                 *,
                 allow_duplicate: bool = False,
+                sources: list[RecipeSource] | None = None,
+                generate_image: bool = True,
+                progress_callback=None,
         ) -> RecipeResult:
             received.append((raw_text, allow_duplicate))
             return RecipeResult(

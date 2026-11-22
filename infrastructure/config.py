@@ -29,6 +29,13 @@ class MCPRegistrySettings(BaseModel):
     url: str
 
 
+class OCRSettings(BaseModel):
+    model_config = ConfigDict(extra = "ignore")
+
+    url: str = "http://127.0.0.1:8041/mcp"
+    timeout_seconds: float = 120.0
+
+
 class RecipeAPISettings(BaseModel):
     model_config = ConfigDict(extra = "ignore")
 
@@ -46,6 +53,7 @@ class AgentConfig(BaseModel):
     model_config = ConfigDict(extra = "ignore")
 
     mcp_registry: MCPRegistrySettings
+    ocr: OCRSettings = OCRSettings()
     recipe_api: RecipeAPISettings = RecipeAPISettings()
     lm: LMConfig
     fuzzy: FuzzySettings = FuzzySettings()

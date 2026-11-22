@@ -1,181 +1,95 @@
-# framework
+# Rekipe Recipe Creator Agent
+
+Agent IA de création et de mise à niveau des recettes. Il accepte trois
+parcours utilisateur tout en conservant les quatre champs historiques de son
+contrat :
+
+- texte copié-collé ;
+- URL publique d'une fiche recette, d'une image ou d'un PDF ;
+- document image ou PDF envoyé en base64.
+
+Les pages Web sont d'abord lues via leurs données Schema.org `Recipe`, avec un
+repli sur le texte visible. Les images et PDF passent par le microservice `ocr` via
+MCP. L'agent complète notamment l'origine, la difficulté, le prix et les temps
+des étapes. La saison reste calculée par `recipe` depuis le catalogue
+ingrédients.
+
+Une fiche existante peut être mise à niveau en place : les ingrédients et
+étapes présents dans la description sont reclassés, les métadonnées absentes
+sont complétées et une image principale est générée si nécessaire. Les champs
+humains déjà renseignés, les favoris, tags, images et métadonnées de migration
+sont préservés.
 
 ## Architecture
 
-**domain/models/**
-Entités et objets valeur du domaine métier (ex: Recipe, Ingredient) — aucune dépendance extérieure
+Le repo suit l'architecture hexagonale `domain → application → adapters →
+infrastructure`. La persistance des recettes et catalogues passe exclusivement
+par le MCP de `recipe`; l'extraction d'image passe exclusivement par le MCP de
+`ocr`. Seuls les `AgentRun` sont persistés localement par l'agent.
 
-**domain/ports/**
-Interfaces abstraites (ABC) définissant les contrats entre le domaine et le monde extérieur
+Consulter [AGENTS.md](./AGENTS.md) pour le graphe LangGraph, les contrats et les
+règles de contribution.
 
-**domain/services/**
-Services métier purs qui orchestrent la logique domaine sans toucher l'infrastructure
+## Démarrage local
 
-**application/use_cases/**
-Cas d'usage applicatifs — orchestrent les ports et services pour répondre à une intention utilisateur
-
-**adapters/input/**
-Adaptateurs entrants — traduisent une requête externe (CLI, HTTP, événement…) en appel de cas d'usage
-
-**adapters/output/**
-Adaptateurs sortants — implémentent les ports de sortie (base de données, API tierce, fichier…)
-
-**infrastructure/**
-Câblage global — instanciation et injection des dépendances, configuration, point d'entrée de l'app
-
----
-
-## Lancement
-
-### Prérequis
+Depuis la racine du workspace :
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+./rekipe_dev.sh up recipe-stack
+curl -fsS http://127.0.0.1:8006/openapi.json >/dev/null
+curl -fsS http://127.0.0.1:8040/ready
 ```
 
-### Configuration OpenAI
+Le wrapper charge `.env.dev`, provisionne le secret OpenAI local dans Vault et
+démarre les MCP nécessaires. Ne pas versionner de clé API.
 
-Le modèle configuré par défaut est OpenAI :
+## API REST
 
-```yaml
-recipe_api:
-  url: http://127.0.0.1:8301
-  tenant_uri: foyer-demo
+- création : `POST http://127.0.0.1:8006/v1/recipes/ai-create` ;
+- mise à niveau : `POST http://127.0.0.1:8006/v1/recipes/{uuid}/ai-enrich` ;
+- progression d'une création : `GET http://127.0.0.1:8006/v1/agent-runs/creations/{tracking_id}/running` ;
+- progression d'une mise à niveau : `GET http://127.0.0.1:8006/v1/agent-runs/recipes/{uuid}/running` ;
+- documentation OpenAPI : `http://127.0.0.1:8006/docs`.
 
-lm:
-  planner:
-    provider: openai
-    model_name: gpt-5.4-mini
-    api_key: ${OPENAI_API_KEY}
-```
-
-La résolution des secrets est configurée dans `config/secrets.yaml` :
-
-```yaml
-resolver: chain
-chain: [vault, yaml]
-mappings:
-  lm.planner.api_key: rekipe/agent-recipe-creator/openai
-```
-
-Option recommandée : stocker la clé dans Vault, au chemin `kv/rekipe/agent-recipe-creator/openai`, champ `value`.
+Exemple texte sans génération d'image :
 
 ```bash
-export VAULT_ADDR="http://127.0.0.1:5991"
-export VAULT_TOKEN="<token-vault>"
-
-vault kv put kv/rekipe/agent-recipe-creator/openai \
-  value="<cle-openai>"
+curl -X POST http://127.0.0.1:8006/v1/recipes/ai-create \
+  -H 'Content-Type: application/json' \
+  -d '{"raw_text":"Soupe : 4 carottes. Cuire 25 minutes puis mixer.","generate_image":false}'
 ```
 
-Fallback local possible pour le développement :
+Le contrat accepte exactement un champ parmi `raw_text`, `source_url`,
+`image_url` et `image_base64`. Avec `image_base64`, `image_media_type` est
+obligatoire.
+
+Le champ optionnel `tracking_id` associe une requête de création à son
+`AgentRun`. Il doit être unique côté client pour permettre le suivi de la phase
+courante pendant l'appel synchrone.
+
+## MCP
+
+Le serveur MCP HTTP de l'agent écoute sur `http://127.0.0.1:8004/mcp` et expose
+notamment :
+
+- `ai_create_recipe(raw_text, allow_duplicate=false)` pour créer une recette ;
+- `ai_enrich_recipe(recipe_uuid, generate_image=true)` pour compléter et
+  reclasser une fiche existante en place.
+
+Le second tool renvoie l'UUID et le nom de la recette, les indicateurs
+`updated` et `image_generated`, ainsi que les éventuels avertissements.
+
+Pendant une création ou une mise à niveau, l'`AgentRun` publie
+`metadata.current_stage` et `metadata.stage_history`. Les phases correspondent
+aux nœuds réellement exécutés : lecture, analyse, vérification, contrôle des
+doublons pour la création, organisation, résolution des ingrédients et
+ustensiles, sauvegarde puis traitement de l'image.
+
+## Validation
 
 ```bash
-cd ./agent-recipe-creator
-cp secrets.yaml.template secrets.yaml
+uv sync --frozen
+uv run --frozen ruff check .
+uv run --frozen mypy domain application adapters infrastructure
+uv run --frozen pytest --cov=. --cov-fail-under=80
 ```
-
-Puis renseigner dans `secrets.yaml` :
-
-```yaml
-lm:
-  planner:
-    api_key: <cle-openai>
-```
-
-Option shell :
-
-```bash
-export OPENAI_API_KEY="<cle-openai>"
-```
-
-`secrets.yaml` est ignoré par Git. `OPENAI_API_KEY` reste accepté si Vault et le fallback YAML ne sont pas disponibles.
-
-### 1. API REST (FastAPI)
-
-Expose un CRUD HTTP sur les ingrédients.
-
-```bash
-python main_api.py
-```
-
-- Swagger UI : [http://localhost:8000/docs](http://localhost:8000/docs)
-- Base URL : `http://localhost:8000/ingredient/v1/`
-
-### 2. Serveur MCP stdio
-
-Utilisé par les clients MCP locaux (Claude Desktop, Cursor…). Le client lance le process lui-même.
-
-```bash
-python main_mcp_stdio.py
-```
-
-Configuration `mcp.json` :
-
-```json
-{
-  "mcpServers": {
-    "rekipe-ingredients": {
-      "command": "/chemin/vers/.venv/bin/python",
-      "args": ["/chemin/vers/framework/main_mcp_stdio.py"]
-    }
-  }
-}
-```
-
-### 3. Serveur MCP SSE
-
-Expose les outils MCP via HTTP SSE. Le serveur doit tourner avant que le client s'y connecte.  
-Tourne sur le port **8000**
-
-```bash
-python main_mcp_sse.py
-```
-
-- SSE endpoint : `http://localhost:8001/sse`
-- Messages endpoint : `http://localhost:8001/messages/`
-
-Configuration `mcp.json` :
-
-```json
-{
-  "mcpServers": {
-    "rekipe-ingredients-sse": {
-      "url": "http://localhost:8000/sse"
-    }
-  }
-}
-```
-
-> **Note** : les serveurs MCP (stdio et SSE) partagent la même instance `create_mcp()` définie dans `infrastructure/mcp.py`. Ajouter un nouveau transport ne nécessite aucune modification du domaine.
-
----
-
-## Passer de InMemory à MongoDB
-
-Par défaut, les trois points d'entrée (`main_api.py`, `main_mcp.py`, `main_mcp_sse.py`) utilisent `InMemoryIngredientRepository` — les données sont perdues à chaque redémarrage.
-
-Pour persister les données dans MongoDB, remplace dans `infrastructure/api.py` et/ou `infrastructure/mcp.py` :
-
-```python
-# Avant
-from adapters.output.in_memory_ingredient_repository import InMemoryIngredientRepository
-ingredient_repository = InMemoryIngredientRepository()
-
-# Après
-from adapters.output.mongodb_config import MongoDBConfig
-from adapters.output.mongodb_ingredient_repository import MongoDBIngredientRepository
-
-config = MongoDBConfig(
-    uri="mongodb://localhost:27017",
-    db_name="rekipe",
-    collection_name="ingredients"
-)
-ingredient_repository = MongoDBIngredientRepository(config)
-```
-
-`MongoDBConfig` accepte n'importe quelle connection string — tu peux ainsi viser une instance locale, Atlas, ou une instance par tenant en passant un `uri` différent.
-
-Seule la ligne d'instanciation change dans `infrastructure/` : le domaine, les services et les cas d'usage n'ont aucune connaissance de MongoDB.

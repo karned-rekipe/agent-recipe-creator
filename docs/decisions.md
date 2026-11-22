@@ -55,6 +55,9 @@ des doublons. Le fuzzy matching tolère les variations mineures tout en restant 
 **Conséquence sur le code :**
 
 - `_make_fuzzy_matcher(threshold)` retourne une fonction `(query, candidates) -> dict | None`.
+- La comparaison porte sur le nom complet normalisé (casse, accents et ligatures)
+  afin qu'un terme court ne corresponde pas à tort à un ingrédient composé qui
+  le contient, par exemple `œufs` et `nouilles aux œufs fraîches`.
 - `candidates` est la liste des entités retournées par `list_ingredients(name)` ou `list_ustensils(name)`.
 - Le matcher est injecté dans `make_check_recipe_node`, `make_resolve_ingredients_node`, `make_resolve_ustensils_node`.
 
