@@ -3,6 +3,7 @@ from collections.abc import Callable
 import re
 import time
 
+from adapters.output.recipe_agent._fuzzy import _lookup_variants
 from adapters.output.recipe_agent._logger import log as logger
 from adapters.output.recipe_agent._mcp_registry import _MCPRecipeRegistry
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
@@ -100,8 +101,15 @@ async def _resolve_ingredients_for_plan(
 ) -> dict[str, str]:
     resolved: dict[str, str] = {}
     for line in plan.ingredients:
-        candidates = await registry.list_ingredients(line.name)
-        match = matcher(line.name, candidates)
+        candidates: list[dict] = []
+        match = None
+        for lookup_name in _lookup_variants(line.name):
+            found = await registry.list_ingredients(lookup_name)
+            known_uuids = {candidate["uuid"] for candidate in candidates}
+            candidates.extend(candidate for candidate in found if candidate["uuid"] not in known_uuids)
+            match = matcher(line.name, candidates)
+            if match:
+                break
         if match:
             logger.info(f"  ♻️  reuse ingredient name={line.name!r} uuid={match['uuid']}")
             resolved[line.name] = match["uuid"]

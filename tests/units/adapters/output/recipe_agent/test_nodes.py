@@ -1,5 +1,6 @@
 from langchain_core.messages import HumanMessage
 
+from adapters.output.recipe_agent._fuzzy import _make_fuzzy_matcher
 from adapters.output.recipe_agent._nodes import (
     _parse_positive_float,
     _unit_from_quantity,
@@ -83,6 +84,20 @@ class FakeRegistry:
 class FakeRegistryWithExistingIngredient(FakeRegistry):
     async def list_ingredients(self, name: str) -> list[dict]:
         return [{"uuid": "existing-ing", "name": name}]
+
+
+class FakeRegistryWithSingularIngredient(FakeRegistry):
+    def __init__(self) -> None:
+        super().__init__()
+        self.ingredient_queries: list[str] = []
+
+    async def list_ingredients(self, name: str) -> list[dict]:
+        self.ingredient_queries.append(name)
+        if name == "œufs":
+            return [{"uuid": "noodles", "name": "nouilles aux œufs fraîches"}]
+        if name == "oeuf":
+            return [{"uuid": "egg", "name": "oeuf"}]
+        return []
 
 
 class FakeRegistryWithExistingUstensil(FakeRegistry):
@@ -230,6 +245,17 @@ async def test_resolve_ingredients_reuses_existing():
     result = await node(state)
     assert result["resolved_ingredients"]["farine"] == "existing-ing"
     assert len(registry.created_ingredients) == 0
+
+
+async def test_resolve_ingredients_rejects_substring_and_retries_singular_name():
+    registry = FakeRegistryWithSingularIngredient()
+    node = make_resolve_ingredients_node(registry, _make_fuzzy_matcher(80))
+    plan = _make_plan(ingredients = [IngredientLine(name = "œufs", unit = "pièce", quantity = "4")])
+    result = await node(_base_state(plan = plan))
+
+    assert result["resolved_ingredients"]["œufs"] == "egg"
+    assert registry.ingredient_queries == ["œufs", "oeufs", "oeuf"]
+    assert registry.created_ingredients == []
 
 
 async def test_resolve_ingredients_multiple():
