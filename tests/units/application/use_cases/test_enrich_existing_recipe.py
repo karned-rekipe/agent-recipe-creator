@@ -4,7 +4,7 @@ from application.use_cases.enrich_existing_recipe import EnrichExistingRecipeUse
 from arclith import InMemoryRepository
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult, RecipeSource
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.ports.recipe_agent import RecipeAgentPort, RecipeProgressCallback
 from tests.units.conftest import NullLogger
 
 
@@ -33,7 +33,17 @@ class _Agent(RecipeAgentPort):
     ) -> RecipeResult:
         return _result()
 
-    async def enrich(self, recipe_uuid: str, run_uuid: str, *, generate_image: bool = True) -> RecipeResult:
+    async def enrich(
+        self,
+        recipe_uuid: str,
+        run_uuid: str,
+        *,
+        generate_image: bool = True,
+        progress_callback: RecipeProgressCallback | None = None,
+    ) -> RecipeResult:
+        if progress_callback is not None:
+            await progress_callback("analyzing")
+            await progress_callback("saving")
         return _result()
 
 
@@ -45,11 +55,22 @@ async def test_enrich_existing_recipe_records_successful_run():
     run = (await repository.find_all())[0]
     assert run.status == "success"
     assert run.metadata["image_generated"] is True
+    assert run.metadata["current_stage"] == "complete"
+    assert run.metadata["stage_history"] == ["starting", "analyzing", "saving", "complete"]
 
 
 async def test_enrich_existing_recipe_records_failure():
     class _FailingAgent(_Agent):
-        async def enrich(self, recipe_uuid: str, run_uuid: str, *, generate_image: bool = True) -> RecipeResult:
+        async def enrich(
+            self,
+            recipe_uuid: str,
+            run_uuid: str,
+            *,
+            generate_image: bool = True,
+            progress_callback: RecipeProgressCallback | None = None,
+        ) -> RecipeResult:
+            if progress_callback is not None:
+                await progress_callback("analyzing")
             raise RuntimeError("planner down")
 
     repository = InMemoryRepository[AgentRun]()
@@ -59,3 +80,5 @@ async def test_enrich_existing_recipe_records_failure():
     run = (await repository.find_all())[0]
     assert run.status == "failed"
     assert run.error == "planner down"
+    assert run.metadata["current_stage"] == "failed"
+    assert run.metadata["stage_history"] == ["starting", "analyzing", "failed"]

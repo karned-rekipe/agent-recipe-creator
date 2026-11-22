@@ -2,6 +2,7 @@ from langchain_core.messages import AIMessage
 
 from adapters.output.recipe_agent.agent_adapter import RecipeAgentAdapter
 from domain.models.recipe import RecipePlan
+from domain.ports.recipe_agent import RecipeEnrichmentStage
 
 
 class _Graph:
@@ -57,9 +58,16 @@ async def test_enrich_loads_existing_recipe_and_updates_in_place():
     graph = _Graph(_graph_result())
     adapter._enrichment_graph = graph
     adapter._registry = _Registry()
-    result = await adapter.enrich("recipe-1", "run-1")
+    stages: list[RecipeEnrichmentStage] = []
+
+    async def report(stage: RecipeEnrichmentStage) -> None:
+        stages.append(stage)
+
+    result = await adapter.enrich("recipe-1", "run-1", progress_callback=report)
     assert result.created is False
     assert result.updated is True
     assert graph.state is not None
     assert graph.state["existing_recipe"]["name"] == "Soupe"
     assert "FICHE EXISTANTE JSON" in graph.state["messages"][0].content
+    assert graph.state["progress_callback"] is report
+    assert stages == ["loading_recipe"]

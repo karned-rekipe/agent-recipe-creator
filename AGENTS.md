@@ -121,6 +121,10 @@ Mise à niveau :
 | `update_recipe`       | Reclasse et complète une recette existante en place         | `update_recipe`                         |
 | `generate_image`      | Génère l'image si elle est absente et demandée              | `generate_recipe_image`                 |
 
+Le MCP d'entrée expose `ai_create_recipe` pour la création et
+`ai_enrich_recipe` pour la mise à niveau en place d'une fiche identifiée par
+son UUID.
+
 ## State LangGraph (`RecipeAgentState`)
 
 | Clé                    | Type                 | Contenu                                    |
@@ -136,6 +140,7 @@ Mise à niveau :
 | `generate_image`       | `bool`                 | Demande de génération d'image               |
 | `warnings`             | `list[str]`            | Avertissements non bloquants                 |
 | `error`                | `str \| None`        | Erreur éventuelle                          |
+| `progress_callback`    | callback ou `None`     | Publication de la phase réelle du graphe     |
 
 ## Configuration (`config.yaml`)
 

@@ -9,12 +9,20 @@ from adapters.output.recipe_agent._mcp_registry import _MCPRecipeRegistry
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
 from adapters.output.recipe_agent._state import RecipeAgentState
 from domain.models.recipe import RecipeComponentPlan, RecipePlan
+from domain.ports.recipe_agent import RecipeEnrichmentStage
 
 type RecipePlanLike = RecipePlan | RecipeComponentPlan
 
 
+async def _report_progress(state: RecipeAgentState, stage: RecipeEnrichmentStage) -> None:
+    callback = state.get("progress_callback")
+    if callback is not None:
+        await callback(stage)
+
+
 def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
     async def plan_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "analyzing")
         user_message = state["messages"][-1].content
         assert isinstance(user_message, str)
         logger.info(f"▶ [plan] length={len(user_message)} content={user_message[:200]!r}")
@@ -36,6 +44,7 @@ def make_plan_node(planner: _PydanticAIPlanner) -> Callable:
 
 def make_review_plan_node(planner: _PydanticAIPlanner) -> Callable:
     async def review_plan_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "reviewing")
         plan = state["plan"]
         assert plan is not None
         user_message = state["messages"][0].content
@@ -141,6 +150,7 @@ async def _resolve_ustensils_for_plan(
 
 def make_create_components_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def create_components_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "organizing")
         plan = state["plan"]
         assert plan is not None
         if not plan.components:
@@ -180,6 +190,7 @@ def make_create_components_node(registry: _MCPRecipeRegistry, matcher: Callable)
 
 def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ingredients_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "ingredients")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [resolve_ingredients] {len(plan.ingredients)} ingredient(s)")
@@ -195,6 +206,7 @@ def make_resolve_ingredients_node(registry: _MCPRecipeRegistry, matcher: Callabl
 
 def make_resolve_ustensils_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def resolve_ustensils_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "equipment")
         plan = state["plan"]
         assert plan is not None
         logger.info(f"▶ [resolve_ustensils] {len(plan.ustensils)} ustensil(s)")
@@ -238,6 +250,7 @@ def make_create_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
 
 def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
     async def update_recipe_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "saving")
         plan = state["plan"]
         existing = state["existing_recipe"]
         recipe_uuid = state["target_recipe_uuid"]
@@ -297,6 +310,7 @@ def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
 
 def make_generate_image_node(registry: _MCPRecipeRegistry) -> Callable:
     async def generate_image_node(state: RecipeAgentState) -> dict:
+        await _report_progress(state, "image")
         if not state["generate_image"]:
             return {"image_generated": False}
         existing = state["existing_recipe"]

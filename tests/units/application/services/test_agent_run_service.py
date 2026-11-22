@@ -63,3 +63,28 @@ async def test_duplicate_creates_new_uuid():
     clone = await service.duplicate(run.uuid)
     assert clone.uuid != run.uuid
     assert clone.raw_input == "original"
+
+
+async def test_find_running_recipe_enrichment():
+    repo = InMemoryRepository[AgentRun]()
+    service = AgentRunService(repo, NullLogger())
+    await service.create(AgentRun(
+        raw_input="existing-recipe:recipe-1",
+        status="success",
+    ))
+    running = await service.create(AgentRun(
+        raw_input="existing-recipe:recipe-1",
+        status="running",
+        metadata={"current_stage": "reviewing"},
+    ))
+    await service.create(AgentRun(
+        raw_input="existing-recipe:recipe-2",
+        status="running",
+    ))
+
+    found = await service.find_running_recipe_enrichment("recipe-1")
+
+    assert found is not None
+    assert found.uuid == running.uuid
+    assert found.metadata["current_stage"] == "reviewing"
+    assert await service.find_running_recipe_enrichment("unknown") is None

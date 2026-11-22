@@ -3,6 +3,7 @@ from adapters.output.recipe_agent._nodes import (
     make_update_recipe_node,
 )
 from domain.models.recipe import IngredientLine, RecipePlan, RecipeSource, RecipeStep, UstensilLine
+from domain.ports.recipe_agent import RecipeEnrichmentStage
 
 
 class _Registry:
@@ -112,3 +113,16 @@ async def test_generate_image_success_skip_and_warning():
     failed = await make_generate_image_node(_Registry(image_error=RuntimeError("media down")))(_state())
     assert failed["image_generated"] is False
     assert "media down" in failed["warnings"][0]
+
+
+async def test_enrichment_nodes_report_real_progress_stages():
+    stages: list[RecipeEnrichmentStage] = []
+
+    async def report(stage: RecipeEnrichmentStage) -> None:
+        stages.append(stage)
+
+    state = _state(progress_callback=report)
+    await make_update_recipe_node(_Registry())(state)
+    await make_generate_image_node(_Registry())(state)
+
+    assert stages == ["saving", "image"]

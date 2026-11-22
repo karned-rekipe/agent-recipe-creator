@@ -4,6 +4,7 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
 from domain.models.recipe import RecipePlan, RecipeSource
+from domain.ports.recipe_agent import RecipeProgressCallback
 
 
 class RecipeAgentState(TypedDict):
@@ -24,3 +25,4 @@ class RecipeAgentState(TypedDict):
     image_generated: bool
     warnings: list[str]
     error: str | None
+    progress_callback: RecipeProgressCallback | None

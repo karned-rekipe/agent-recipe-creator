@@ -47,6 +47,7 @@ démarre les MCP nécessaires. Ne pas versionner de clé API.
 
 - création : `POST http://127.0.0.1:8006/v1/recipes/ai-create` ;
 - mise à niveau : `POST http://127.0.0.1:8006/v1/recipes/{uuid}/ai-enrich` ;
+- progression active : `GET http://127.0.0.1:8006/v1/agent-runs/recipes/{uuid}/running` ;
 - documentation OpenAPI : `http://127.0.0.1:8006/docs`.
 
 Exemple texte sans génération d'image :
@@ -60,6 +61,23 @@ curl -X POST http://127.0.0.1:8006/v1/recipes/ai-create \
 Le contrat accepte exactement un champ parmi `raw_text`, `source_url`,
 `image_url` et `image_base64`. Avec `image_base64`, `image_media_type` est
 obligatoire.
+
+## MCP
+
+Le serveur MCP HTTP de l'agent écoute sur `http://127.0.0.1:8004/mcp` et expose
+notamment :
+
+- `ai_create_recipe(raw_text, allow_duplicate=false)` pour créer une recette ;
+- `ai_enrich_recipe(recipe_uuid, generate_image=true)` pour compléter et
+  reclasser une fiche existante en place.
+
+Le second tool renvoie l'UUID et le nom de la recette, les indicateurs
+`updated` et `image_generated`, ainsi que les éventuels avertissements.
+
+Pendant une mise à niveau, l'`AgentRun` publie `metadata.current_stage` et
+`metadata.stage_history`. Les phases correspondent aux nœuds réellement
+exécutés : lecture, analyse, vérification, organisation, résolution des
+ingrédients et ustensiles, sauvegarde puis traitement de l'image.
 
 ## Validation
 

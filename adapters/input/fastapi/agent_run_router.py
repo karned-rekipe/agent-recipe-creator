@@ -16,6 +16,12 @@ class AgentRunRouter:
 
     def _register_routes(self) -> None:
         self.router.add_api_route("/", self.list_runs, methods = ["GET"], response_model = list[AgentRunSchema])
+        self.router.add_api_route(
+            "/recipes/{recipe_uuid}/running",
+            self.get_running_recipe_enrichment,
+            methods=["GET"],
+            response_model=AgentRunSchema,
+        )
         self.router.add_api_route("/{uuid}", self.get_run, methods = ["GET"], response_model = AgentRunSchema)
 
     async def list_runs(self) -> list[AgentRunSchema]:
@@ -29,3 +35,10 @@ class AgentRunRouter:
         if run is None:
             raise HTTPException(status_code = 404, detail = "Agent run not found")
         return AgentRunSchema.model_validate(run, from_attributes = True)
+
+    async def get_running_recipe_enrichment(self, recipe_uuid: str) -> AgentRunSchema:
+        """Return the active enrichment run for one recipe, when present."""
+        run = await self._service.find_running_recipe_enrichment(recipe_uuid)
+        if run is None:
+            raise HTTPException(status_code=404, detail="No running enrichment for this recipe")
+        return AgentRunSchema.model_validate(run, from_attributes=True)

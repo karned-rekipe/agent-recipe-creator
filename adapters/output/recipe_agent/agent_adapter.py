@@ -17,7 +17,7 @@ from adapters.output.recipe_agent._nodes import (
 from adapters.output.recipe_agent._planner import _PydanticAIPlanner
 from adapters.output.recipe_agent._state import RecipeAgentState
 from domain.models.recipe import RecipeResult, RecipeSource
-from domain.ports.recipe_agent import RecipeAgentPort
+from domain.ports.recipe_agent import RecipeAgentPort, RecipeProgressCallback
 from infrastructure.config import AgentConfig
 
 
@@ -106,6 +106,7 @@ class RecipeAgentAdapter(RecipeAgentPort):
             "image_generated": False,
             "warnings": [],
             "error": None,
+            "progress_callback": None,
         }
         result = await self._graph.ainvoke(initial_state)
         last_message = result["messages"][-1]
@@ -126,9 +127,18 @@ class RecipeAgentAdapter(RecipeAgentPort):
             warnings=result["warnings"],
         )
 
-    async def enrich(self, recipe_uuid: str, run_uuid: str, *, generate_image: bool = True) -> RecipeResult:
+    async def enrich(
+        self,
+        recipe_uuid: str,
+        run_uuid: str,
+        *,
+        generate_image: bool = True,
+        progress_callback: RecipeProgressCallback | None = None,
+    ) -> RecipeResult:
         import json
 
+        if progress_callback is not None:
+            await progress_callback("loading_recipe")
         existing = await self._registry.get_recipe(recipe_uuid)
         if existing is None:
             raise KeyError(f"Recipe with uuid {recipe_uuid} not found")
@@ -155,6 +165,7 @@ class RecipeAgentAdapter(RecipeAgentPort):
             "image_generated": False,
             "warnings": [],
             "error": None,
+            "progress_callback": progress_callback,
         }
         result = await self._enrichment_graph.ainvoke(initial_state)
         last_message = result["messages"][-1]
