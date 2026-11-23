@@ -1,11 +1,14 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from fastapi import HTTPException, Response
 
 from adapters.input.fastapi.recipe_router import RecipeRouter
-from adapters.input.schemas.recipe_schema import AiCreateRequestSchema
+from adapters.input.schemas.recipe_schema import AiCreateRequestSchema, AiEnrichRequestSchema
 from application.services.recipe_service import RecipeService
 from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
+from domain.errors import AIProviderCreditExhaustedError
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult, RecipeSource
 from domain.ports.recipe_agent import RecipeAgentPort
@@ -151,6 +154,36 @@ async def test_ai_create_raises_500_on_agent_failure():
         await router.ai_create(payload, Response())
     assert exc_info.value.status_code == 500
     assert "agent failed" in exc_info.value.detail
+
+
+async def test_ai_create_returns_user_friendly_503_when_openai_credit_is_exhausted():
+    class _CreditExhaustedAgent(_FailingAgent):
+        async def process(self, *args, **kwargs) -> RecipeResult:
+            raise AIProviderCreditExhaustedError()
+
+    router = _make_router(_CreditExhaustedAgent())
+    payload = AiCreateRequestSchema(raw_text="Recette complète qui nécessite le traitement IA")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await router.ai_create(payload, Response())
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == "ai_provider_credit_exhausted"
+    assert "crédit OpenAI est épuisé" in exc_info.value.detail["message"]
+    assert "status_code" not in exc_info.value.detail["message"]
+
+
+async def test_ai_enrich_returns_user_friendly_503_when_openai_credit_is_exhausted():
+    service = MagicMock(spec=RecipeService)
+    service.ai_enrich = AsyncMock(side_effect=AIProviderCreditExhaustedError())
+    router = RecipeRouter(service, NullLogger())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await router.ai_enrich("recipe-1", AiEnrichRequestSchema())
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == "ai_provider_credit_exhausted"
+    assert "crédit OpenAI est épuisé" in exc_info.value.detail["message"]
 
 
 async def test_ai_create_raises_422_on_invalid_source():

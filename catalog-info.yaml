@@ -52,19 +52,19 @@ spec:
   system: system:default/rekipe
   definition: |
     openapi: 3.1.0
-    info: {title: Rekipe Recipe Agent REST API, version: 0.3.0}
+    info: {title: Rekipe Recipe Agent REST API, version: 0.3.1}
     servers:
       - {url: https://rekipe.amazone.lan/api/recipe-agent, description: Préproduction privée}
     paths:
       /v1/recipes/ai-create:
         post:
           summary: Créer une recette depuis du texte, une URL ou un document
-          responses: {"201": {description: Recette créée}, "200": {description: Doublon ou résultat existant}, "422": {description: Entrée invalide}}
+          responses: {"201": {description: Recette créée}, "200": {description: Doublon ou résultat existant}, "422": {description: Entrée invalide}, "503": {description: Crédit du fournisseur IA épuisé}}
       /v1/recipes/{recipe_uuid}/ai-enrich:
         post:
           summary: Reclasser et enrichir une fiche existante
           parameters: [{name: recipe_uuid, in: path, required: true, schema: {type: string, format: uuid}}]
-          responses: {"200": {description: Recette enrichie}, "404": {description: Recette inconnue}}
+          responses: {"200": {description: Recette enrichie}, "404": {description: Recette inconnue}, "503": {description: Crédit du fournisseur IA épuisé}}
       /v1/agent-runs/recipes/{recipe_uuid}/running:
         get:
           summary: Lire la progression active d'un enrichissement

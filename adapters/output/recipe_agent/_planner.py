@@ -1,12 +1,15 @@
+from collections.abc import Mapping
 from typing import cast
 
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel, OpenAIModelProfile, OpenAIResponsesModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from adapters.output.recipe_agent._logger import log as logger
+from domain.errors import AIProviderCreditExhaustedError
 from domain.models.recipe import RecipePlan
 from infrastructure.config import LMSettings
 
@@ -74,6 +77,33 @@ _LOCAL_PROFILE = OpenAIModelProfile(
     openai_chat_send_back_thinking_parts = False,
 )
 
+_OPENAI_CREDIT_EXHAUSTION_CODES = frozenset({"credit_balance_exhausted", "insufficient_quota"})
+
+
+def _is_openai_credit_exhausted(exc: ModelHTTPError) -> bool:
+    if exc.status_code != 429 or not isinstance(exc.body, Mapping):
+        return False
+
+    body = exc.body.get("error", exc.body)
+    if not isinstance(body, Mapping):
+        return False
+
+    provider_codes = {
+        value
+        for key in ("code", "type")
+        if isinstance((value := body.get(key)), str)
+    }
+    return bool(provider_codes & _OPENAI_CREDIT_EXHAUSTION_CODES)
+
+
+async def _run_with_provider_error_mapping(agent: Agent[None, RecipePlan], prompt: str):
+    try:
+        return await agent.run(prompt)
+    except ModelHTTPError as exc:
+        if _is_openai_credit_exhausted(exc):
+            raise AIProviderCreditExhaustedError() from exc
+        raise
+
 
 def _build_model(settings: LMSettings):
     if settings.provider == "anthropic":
@@ -111,7 +141,10 @@ class _PydanticAIPlanner:
         ))
 
     async def plan(self, user_input: str, available_tags: list[str] | None = None) -> RecipePlan:
-        result = await self._agent.run(_with_tag_catalog(user_input, available_tags))
+        result = await _run_with_provider_error_mapping(
+            self._agent,
+            _with_tag_catalog(user_input, available_tags),
+        )
         self._log_messages(result)
         usage = result.usage()
         logger.debug(
@@ -133,7 +166,7 @@ class _PydanticAIPlanner:
             f"{plan.model_dump_json()}\n\n"
             f"CATALOGUE DE TAGS AUTORISÉS:\n{_format_tag_catalog(available_tags)}"
         )
-        result = await self._review_agent.run(review_input)
+        result = await _run_with_provider_error_mapping(self._review_agent, review_input)
         self._log_messages(result)
         usage = result.usage()
         logger.debug(

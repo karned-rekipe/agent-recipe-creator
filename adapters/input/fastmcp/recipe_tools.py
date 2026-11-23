@@ -4,6 +4,8 @@ import fastmcp
 from adapters.input.schemas.recipe_schema import AiCreateResponseSchema
 from application.services.recipe_service import RecipeService
 from arclith.domain.ports.logger import Logger
+from domain.errors import AIProviderCreditExhaustedError
+from fastmcp.exceptions import ToolError
 from pydantic import Field
 
 
@@ -35,6 +37,9 @@ class RecipeMCP:
             """Structure and register a raw recipe via AI agent."""
             try:
                 result = await service.ai_create(raw_text, allow_duplicate = allow_duplicate)
+            except AIProviderCreditExhaustedError as exc:
+                logger.error("💳 OpenAI credit exhausted via MCP", error_code=exc.code)
+                raise ToolError(str(exc)) from exc
             except Exception as exc:
                 logger.error("💥 ai_create_recipe failed via MCP", error = str(exc))
                 raise
@@ -71,6 +76,13 @@ class RecipeMCP:
             """Complete and reorganize an existing recipe in place via the AI agent."""
             try:
                 result = await service.ai_enrich(recipe_uuid, generate_image=generate_image)
+            except AIProviderCreditExhaustedError as exc:
+                logger.error(
+                    "💳 OpenAI credit exhausted via MCP",
+                    error_code=exc.code,
+                    recipe_uuid=recipe_uuid,
+                )
+                raise ToolError(str(exc)) from exc
             except Exception as exc:
                 logger.error(
                     "💥 ai_enrich_recipe failed via MCP",
