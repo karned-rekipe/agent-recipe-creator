@@ -2,6 +2,7 @@ import pytest
 
 from application.use_cases.process_raw_recipe import ProcessRawRecipeUseCase
 from arclith import InMemoryRepository
+from domain.errors import AIProviderCreditExhaustedError
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult, RecipeSource
 from domain.ports.recipe_agent import RecipeAgentPort
@@ -165,6 +166,24 @@ async def test_execute_failure_updates_run_to_failed():
     assert "elapsed_ms" in run.metadata
     assert run.metadata["current_stage"] == "failed"
     assert run.metadata["stage_history"] == ["starting", "analyzing", "failed"]
+
+
+async def test_execute_credit_exhaustion_stores_public_error_and_stable_code():
+    class _CreditExhaustedAgent(_FailingAgent):
+        async def process(self, *args, **kwargs) -> RecipeResult:
+            raise AIProviderCreditExhaustedError()
+
+    repo = InMemoryRepository[AgentRun]()
+    use_case = ProcessRawRecipeUseCase(_CreditExhaustedAgent(), repo, NullLogger())
+
+    with pytest.raises(AIProviderCreditExhaustedError):
+        await use_case.execute("recette échouée")
+
+    run = (await repo.find_all())[0]
+    assert run.error is not None
+    assert "crédit OpenAI est épuisé" in run.error
+    assert "status_code" not in run.error
+    assert run.metadata["error_code"] == "ai_provider_credit_exhausted"
 
 
 async def test_execute_failure_reraises_original_exception():

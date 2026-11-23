@@ -1,6 +1,7 @@
 from adapters.input.schemas.recipe_schema import AiCreateRequestSchema, AiCreateResponseSchema, AiEnrichRequestSchema
 from application.services.recipe_service import RecipeService
 from arclith.domain.ports.logger import Logger
+from domain.errors import AIProviderCreditExhaustedError
 from fastapi import APIRouter, HTTPException, Response, status
 
 
@@ -18,6 +19,7 @@ class RecipeRouter:
             methods = ["POST"],
             response_model = AiCreateResponseSchema,
             status_code = 201,
+            responses={503: {"description": "Crédit du fournisseur IA épuisé"}},
         )
         self.router.add_api_route(
             "/{recipe_uuid}/ai-enrich",
@@ -25,6 +27,7 @@ class RecipeRouter:
             methods=["POST"],
             response_model=AiCreateResponseSchema,
             status_code=200,
+            responses={503: {"description": "Crédit du fournisseur IA épuisé"}},
         )
 
     async def ai_create(
@@ -42,6 +45,12 @@ class RecipeRouter:
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except AIProviderCreditExhaustedError as exc:
+            self._logger.error("💳 OpenAI credit exhausted via HTTP", error_code=exc.code)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"code": exc.code, "message": str(exc)},
+            ) from exc
         except Exception as exc:
             self._logger.error("💥 ai_create failed via HTTP", error = str(exc))
             raise HTTPException(status_code = 500, detail = str(exc)) from exc
@@ -66,6 +75,16 @@ class RecipeRouter:
             result = await self._service.ai_enrich(recipe_uuid, generate_image=payload.generate_image)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except AIProviderCreditExhaustedError as exc:
+            self._logger.error(
+                "💳 OpenAI credit exhausted via HTTP",
+                error_code=exc.code,
+                recipe_uuid=recipe_uuid,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={"code": exc.code, "message": str(exc)},
+            ) from exc
         except Exception as exc:
             self._logger.error("💥 ai_enrich failed via HTTP", error=str(exc), recipe_uuid=recipe_uuid)
             raise HTTPException(status_code=500, detail=str(exc)) from exc

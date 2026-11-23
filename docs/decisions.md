@@ -102,3 +102,22 @@ depuis `secrets.yaml.template` et renseigner `lm.planner.api_key`.
 - `config/secrets.yaml` mappe `lm.planner.api_key` vers `rekipe/agent-recipe-creator/anthropic`.
 - `infrastructure/config.py` → `load_agent_config()` fusionne `config.yaml`, applique Vault/YAML et garde le fallback environnement.
 - `.gitignore` exclut `secrets.yaml`.
+
+---
+
+## ADR-006 — Erreur stable pour l’épuisement du crédit OpenAI
+
+**Contexte :** OpenAI renvoie l’épuisement du crédit sous la forme d’une erreur HTTP `429` dont les champs structurés
+valent `credit_balance_exhausted` et/ou `insufficient_quota`. Cette erreur n’est pas un rate limit transitoire et son
+payload fournisseur brut n’est pas compréhensible pour l’utilisateur.
+
+**Décision :** `_PydanticAIPlanner` classe uniquement ces codes structurés et lève
+`AIProviderCreditExhaustedError`. Le message public indique que le crédit est épuisé, qu’aucune recette n’a été créée
+ou modifiée, et qu’une recharge ou l’intervention de l’administrateur est nécessaire.
+
+**Conséquence sur le code :**
+
+- REST renvoie `503` avec le code stable `ai_provider_credit_exhausted` et le message public ;
+- MCP lève un `ToolError` avec ce même message public ;
+- `AgentRun.error` conserve le message public et `AgentRun.metadata.error_code` le code stable ;
+- un vrai `rate_limit_exceeded` conserve son traitement existant et n’est pas reclassé comme crédit épuisé.

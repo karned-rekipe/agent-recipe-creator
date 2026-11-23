@@ -2,6 +2,7 @@ import time
 
 from arclith.domain.ports.logger import Logger
 from arclith.domain.ports.repository import Repository
+from domain.errors import AIProviderCreditExhaustedError
 from domain.models.agent_run import AgentRun
 from domain.models.recipe import RecipeResult
 from domain.ports.recipe_agent import RecipeAgentPort, RecipeEnrichmentStage
@@ -64,10 +65,13 @@ class EnrichExistingRecipeUseCase:
                 exc = exc.exceptions[0]
             elapsed_ms = round((time.perf_counter() - started) * 1000)
             await report_progress("failed")
+            error_metadata = {**run.metadata, "elapsed_ms": elapsed_ms}
+            if isinstance(exc, AIProviderCreditExhaustedError):
+                error_metadata["error_code"] = exc.code
             await self._run_repository.update(run.model_copy(update={
                 "status": "failed",
                 "error": str(exc),
-                "metadata": {**run.metadata, "elapsed_ms": elapsed_ms},
+                "metadata": error_metadata,
             }))
             self._logger.error("💥 Existing recipe enrichment failed", run_uuid=run_uuid, error=str(exc))
             raise exc

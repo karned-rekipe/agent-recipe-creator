@@ -5,6 +5,7 @@ import pytest
 from fastmcp.exceptions import ToolError
 
 from adapters.input.fastmcp.recipe_tools import RecipeMCP
+from domain.errors import AIProviderCreditExhaustedError
 from domain.models.recipe import RecipeResult
 
 
@@ -67,6 +68,21 @@ async def test_ai_create_recipe_raises_on_error():
         await mcp.call_tool("ai_create_recipe", {"raw_text": "some recipe"})
 
 
+async def test_ai_create_recipe_reports_exhausted_credit_without_provider_payload():
+    mcp = _make_mcp()
+    service = MagicMock()
+    service.ai_create = AsyncMock(side_effect=AIProviderCreditExhaustedError())
+    RecipeMCP(service, MagicMock(), mcp)
+
+    with pytest.raises(ToolError) as exc_info:
+        await mcp.call_tool("ai_create_recipe", {"raw_text": "some recipe"})
+
+    message = str(exc_info.value)
+    assert "crédit OpenAI est épuisé" in message
+    assert "status_code" not in message
+    assert "insufficient_quota" not in message
+
+
 async def test_ai_enrich_recipe_success():
     mcp = _make_mcp()
     service = MagicMock()
@@ -103,3 +119,18 @@ async def test_ai_enrich_recipe_raises_on_error():
 
     with pytest.raises(ToolError, match="planner down"):
         await mcp.call_tool("ai_enrich_recipe", {"recipe_uuid": "recipe-1"})
+
+
+async def test_ai_enrich_recipe_reports_exhausted_credit_without_provider_payload():
+    mcp = _make_mcp()
+    service = MagicMock()
+    service.ai_enrich = AsyncMock(side_effect=AIProviderCreditExhaustedError())
+    RecipeMCP(service, MagicMock(), mcp)
+
+    with pytest.raises(ToolError) as exc_info:
+        await mcp.call_tool("ai_enrich_recipe", {"recipe_uuid": "recipe-1"})
+
+    message = str(exc_info.value)
+    assert "crédit OpenAI est épuisé" in message
+    assert "status_code" not in message
+    assert "insufficient_quota" not in message
