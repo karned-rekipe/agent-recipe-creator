@@ -116,6 +116,25 @@ async def test_update_recipe_reclassifies_and_preserves_unrelated_fields():
     assert "mise à niveau" in result["messages"][0]["content"]
 
 
+async def test_update_recipe_omits_missing_uuid_from_existing_component():
+    state = _state()
+    state["existing_recipe"]["components"] = [{
+        "uuid": None,
+        "recipe_uuid": "00000000-0000-4000-8000-000000000001",
+        "label": "Levain",
+        "rank": 1,
+        "servings_multiplier": 1.0,
+    }]
+    registry = _Registry()
+
+    await make_update_recipe_node(registry)(state)
+
+    assert registry.updated is not None
+    component = registry.updated[1]["components"][0]
+    assert component["recipe_uuid"] == "00000000-0000-4000-8000-000000000001"
+    assert "uuid" not in component
+
+
 async def test_generate_image_success_skip_and_warning():
     registry = _Registry()
     node = make_generate_image_node(registry)
