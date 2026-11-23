@@ -13,6 +13,11 @@ après navigation ou rafraîchissement.
 L'enrichissement sélectionne ses tags uniquement dans le catalogue exposé par
 Recipe et fusionne les UUID retenus avec les associations déjà présentes.
 
+Le code pays produit par l'IA est normalisé par `recipe` avant persistance. Une
+valeur inconnue ou incompatible devient absente, est conservée dans les
+avertissements du résultat et dans les métadonnées du `AgentRun`, sans faire
+échouer l'enrichissement.
+
 Le MCP interne expose `ai_create_recipe` et `ai_enrich_recipe`. Il n'est pas
 publié par un Ingress tant qu'une protection équivalente à celle du MCP Recipe
 n'est pas disponible.

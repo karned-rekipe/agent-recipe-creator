@@ -1,5 +1,6 @@
 from adapters.output.recipe_agent._nodes import (
     make_generate_image_node,
+    make_normalize_origin_country_node,
     make_update_recipe_node,
 )
 from domain.models.recipe import IngredientLine, RecipePlan, RecipeSource, RecipeStep, UstensilLine
@@ -7,10 +8,21 @@ from domain.ports.recipe_agent import RecipeEnrichmentStage
 
 
 class _Registry:
-    def __init__(self, *, image_error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        image_error: Exception | None = None,
+        country_normalization: dict | Exception | None = None,
+    ) -> None:
         self.updated: tuple[str, dict] | None = None
         self.generated: list[str] = []
         self.image_error = image_error
+        self.country_normalization = country_normalization or {"origin_country": "FR", "warning": None}
+
+    async def normalize_origin_country(self, origin_country: str) -> dict:
+        if isinstance(self.country_normalization, Exception):
+            raise self.country_normalization
+        return self.country_normalization
 
     async def update_recipe(self, uuid: str, payload: dict) -> dict:
         self.updated = (uuid, payload)
@@ -116,6 +128,29 @@ async def test_generate_image_success_skip_and_warning():
     failed = await make_generate_image_node(_Registry(image_error=RuntimeError("media down")))(_state())
     assert failed["image_generated"] is False
     assert "media down" in failed["warnings"][0]
+
+
+async def test_normalize_origin_country_ignores_unknown_code_without_stopping_enrichment():
+    state = _state(plan=RecipePlan(name="Soupe", origin_country="XK"))
+    result = await make_normalize_origin_country_node(_Registry(
+        country_normalization={
+            "origin_country": None,
+            "warning": "Le code pays IA 'XK' est inconnu ou incompatible ; le pays d'origine a été ignoré.",
+        },
+    ))(state)
+
+    assert result["plan"].origin_country is None
+    assert "a été ignoré" in result["warnings"][0]
+
+
+async def test_normalize_origin_country_continues_when_validation_service_fails():
+    state = _state(plan=RecipePlan(name="Soupe", origin_country="FR"))
+    result = await make_normalize_origin_country_node(_Registry(
+        country_normalization=RuntimeError("backend down"),
+    ))(state)
+
+    assert result["plan"].origin_country is None
+    assert "n'a pas pu être validé" in result["warnings"][0]
 
 
 async def test_enrichment_nodes_report_real_progress_stages():

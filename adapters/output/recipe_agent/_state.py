@@ -1,3 +1,4 @@
+from operator import add
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import BaseMessage
@@ -25,6 +26,6 @@ class RecipeAgentState(TypedDict):
     input_sources: list[RecipeSource]
     generate_image: bool
     image_generated: bool
-    warnings: list[str]
+    warnings: Annotated[list[str], add]
     error: str | None
     progress_callback: RecipeProgressCallback | None

@@ -197,6 +197,9 @@ class _MCPRecipeRegistry:
     async def get_recipe(self, uuid: str) -> dict | None:
         return await self._call("get_recipe", {"uuid": uuid})
 
+    async def normalize_origin_country(self, origin_country: str | None) -> dict:
+        return await self._call("normalize_origin_country", {"origin_country": origin_country})
+
     async def update_recipe(self, uuid: str, payload: dict) -> dict:
         return await self._call("update_recipe", {"uuid": uuid, "payload": payload})
 

@@ -84,6 +84,10 @@ notamment :
 Le second tool renvoie l'UUID et le nom de la recette, les indicateurs
 `updated` et `image_generated`, ainsi que les éventuels avertissements.
 
+Avant toute persistance, l'agent normalise le code pays proposé par l'IA via
+le backend `recipe`. Un code inconnu ou incompatible est écarté, ajouté aux
+avertissements du résultat et ne bloque pas les autres champs de la recette.
+
 Pendant une création ou une mise à niveau, l'`AgentRun` publie
 `metadata.current_stage` et `metadata.stage_history`. Les phases correspondent
 aux nœuds réellement exécutés : lecture, analyse, vérification, contrôle des

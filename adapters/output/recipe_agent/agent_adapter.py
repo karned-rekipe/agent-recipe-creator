@@ -8,6 +8,7 @@ from adapters.output.recipe_agent._nodes import (
     make_create_components_node,
     make_create_recipe_node,
     make_generate_image_node,
+    make_normalize_origin_country_node,
     make_plan_node,
     make_review_plan_node,
     make_resolve_ingredients_node,
@@ -31,6 +32,7 @@ def _build_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry, matc
 
     g.add_node("plan", make_plan_node(planner, registry))
     g.add_node("review_plan", make_review_plan_node(planner))
+    g.add_node("normalize_origin_country", make_normalize_origin_country_node(registry))
     g.add_node("check_recipe", make_check_recipe_node(registry, matcher))
     g.add_node("create_components", make_create_components_node(registry, matcher))
     g.add_node("resolve_ingredients", make_resolve_ingredients_node(registry, matcher))
@@ -41,7 +43,8 @@ def _build_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeRegistry, matc
 
     g.set_entry_point("plan")
     g.add_edge("plan", "review_plan")
-    g.add_edge("review_plan", "check_recipe")
+    g.add_edge("review_plan", "normalize_origin_country")
+    g.add_edge("normalize_origin_country", "check_recipe")
     g.add_conditional_edges("check_recipe", _route_check_recipe, {"exists": END, "new": "create_components"})
     g.add_edge("create_components", "resolve_ingredients")
     g.add_edge("resolve_ingredients", "resolve_ustensils")
@@ -57,6 +60,7 @@ def _build_enrichment_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeReg
     g = StateGraph(RecipeAgentState)
     g.add_node("plan", make_plan_node(planner, registry))
     g.add_node("review_plan", make_review_plan_node(planner))
+    g.add_node("normalize_origin_country", make_normalize_origin_country_node(registry))
     g.add_node("create_components", make_create_components_node(registry, matcher))
     g.add_node("resolve_ingredients", make_resolve_ingredients_node(registry, matcher))
     g.add_node("resolve_ustensils", make_resolve_ustensils_node(registry, matcher))
@@ -65,7 +69,8 @@ def _build_enrichment_graph(planner: _PydanticAIPlanner, registry: _MCPRecipeReg
     g.add_node("generate_image", make_generate_image_node(registry))
     g.set_entry_point("plan")
     g.add_edge("plan", "review_plan")
-    g.add_edge("review_plan", "create_components")
+    g.add_edge("review_plan", "normalize_origin_country")
+    g.add_edge("normalize_origin_country", "create_components")
     g.add_edge("create_components", "resolve_ingredients")
     g.add_edge("resolve_ingredients", "resolve_ustensils")
     g.add_edge("resolve_ustensils", "resolve_tags")
