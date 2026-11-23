@@ -320,7 +320,7 @@ def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
 
         components = state["resolved_components"] or [
             {
-                "uuid": component.get("uuid"),
+                **({"uuid": component["uuid"]} if component.get("uuid") else {}),
                 "recipe_uuid": component["recipe_uuid"],
                 "label": component["label"],
                 "rank": component["rank"],
