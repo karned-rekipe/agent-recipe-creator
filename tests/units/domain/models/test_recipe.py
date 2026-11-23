@@ -46,6 +46,12 @@ def test_recipe_plan_defaults():
     assert plan.name == "Tarte Tatin"
     assert plan.description is None
     assert plan.servings is None
+
+
+def test_recipe_plan_keeps_an_untrusted_country_candidate_for_normalization():
+    plan = RecipePlan(name="Tarte", origin_country="XK")
+
+    assert plan.origin_country == "XK"
     assert plan.prep_time_minutes is None
     assert plan.cook_time_minutes is None
     assert plan.ingredients == []

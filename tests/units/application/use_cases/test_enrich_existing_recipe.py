@@ -19,6 +19,7 @@ def _result() -> RecipeResult:
         created=False,
         updated=True,
         image_generated=True,
+        warnings=["Le code pays IA 'XK' est inconnu ou incompatible ; le pays d'origine a été ignoré."],
     )
 
 
@@ -57,6 +58,9 @@ async def test_enrich_existing_recipe_records_successful_run():
     run = (await repository.find_all())[0]
     assert run.status == "success"
     assert run.metadata["image_generated"] is True
+    assert run.metadata["warnings"] == [
+        "Le code pays IA 'XK' est inconnu ou incompatible ; le pays d'origine a été ignoré."
+    ]
     assert run.metadata["current_stage"] == "complete"
     assert run.metadata["stage_history"] == ["starting", "analyzing", "saving", "complete"]
 

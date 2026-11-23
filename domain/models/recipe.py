@@ -69,8 +69,7 @@ class RecipePlan(BaseModel):
     cook_time_minutes: int | None = Field(default = None, description = "Temps de cuisson en minutes")
     origin_country: str | None = Field(
         default = None,
-        pattern = r"^[A-Z]{2}$",
-        description = "Pays d'origine probable au format ISO 3166-1 alpha-2",
+        description = "Code pays candidat produit par l'IA, normalisé avant persistance.",
     )
     difficulty: int | None = Field(default = None, ge = 1, le = 5, description = "Difficulté de 1 à 5")
     price: int | None = Field(default = None, ge = 1, le = 5, description = "Niveau de prix de 1 à 5")

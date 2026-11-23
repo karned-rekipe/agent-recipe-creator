@@ -73,6 +73,38 @@ def make_review_plan_node(planner: _PydanticAIPlanner) -> Callable:
     return review_plan_node
 
 
+def make_normalize_origin_country_node(registry: _MCPRecipeRegistry) -> Callable:
+    async def normalize_origin_country_node(state: RecipeAgentState) -> dict:
+        plan = state["plan"]
+        assert plan is not None
+        if plan.origin_country is None:
+            return {}
+
+        try:
+            normalized = await registry.normalize_origin_country(plan.origin_country)
+            origin_country = normalized.get("origin_country")
+            warning = normalized.get("warning")
+        except Exception as exc:
+            logger.warning(
+                f"⚠️ [normalize_origin_country] candidate={plan.origin_country!r} error={exc}"
+            )
+            origin_country = None
+            warning = (
+                f"Le code pays IA {plan.origin_country!r} n'a pas pu être validé ; "
+                "le pays d'origine a été ignoré."
+            )
+
+        if not isinstance(origin_country, str):
+            origin_country = None
+        updated_plan = plan.model_copy(update={"origin_country": origin_country})
+        if not isinstance(warning, str) or not warning:
+            return {"plan": updated_plan}
+        logger.warning(f"⚠️ [normalize_origin_country] {warning}")
+        return {"plan": updated_plan, "warnings": [warning]}
+
+    return normalize_origin_country_node
+
+
 def make_check_recipe_node(registry: _MCPRecipeRegistry, matcher: Callable) -> Callable:
     async def check_recipe_node(state: RecipeAgentState) -> dict:
         await _report_progress(state, "checking_duplicate")

@@ -56,6 +56,7 @@ async def test_recipe_registry_call_and_public_wrappers(monkeypatch):
     await registry.create_equipment("fouet")
     await registry.create_recipe({"name": "Cake"})
     await registry.get_recipe("id")
+    await registry.normalize_origin_country("XK")
     await registry.update_recipe("id", {"name": "Cake"})
     await registry.generate_recipe_image("id")
     await registry.list_tags()
@@ -64,6 +65,7 @@ async def test_recipe_registry_call_and_public_wrappers(monkeypatch):
         "create_equipment",
         "create_recipe",
         "get_recipe",
+        "normalize_origin_country",
         "update_recipe",
         "generate_recipe_image",
         "list_tags",
