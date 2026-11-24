@@ -200,11 +200,18 @@ def make_create_components_node(registry: _MCPRecipeRegistry, matcher: Callable)
         logger.info(f"▶ [create_components] {len(plan.components)} component(s)")
         t0 = time.perf_counter()
         resolved_components: list[dict] = []
+        target_recipe_uuid = state.get("target_recipe_uuid")
         for rank, component in enumerate(plan.components, 1):
             candidates = await registry.list_recipes(component.name)
             match = matcher(component.name, candidates)
             if match:
                 child_uuid = match["uuid"]
+                if target_recipe_uuid and str(child_uuid) == str(target_recipe_uuid):
+                    logger.warning(
+                        "⚠️ [create_components] ignore self component "
+                        f"name={component.name!r} uuid={child_uuid}"
+                    )
+                    continue
                 logger.info(f"  ♻️  reuse component name={component.name!r} uuid={child_uuid}")
             else:
                 component_ingredients = await _resolve_ingredients_for_plan(component, registry, matcher)
@@ -318,7 +325,12 @@ def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
         recipe_uuid = state["target_recipe_uuid"]
         assert plan is not None and existing is not None and recipe_uuid is not None
 
-        components = state["resolved_components"] or [
+        resolved_components = [
+            component
+            for component in state["resolved_components"]
+            if str(component["recipe_uuid"]) != str(recipe_uuid)
+        ]
+        existing_components = [
             {
                 **({"uuid": component["uuid"]} if component.get("uuid") else {}),
                 "recipe_uuid": component["recipe_uuid"],
@@ -327,7 +339,9 @@ def make_update_recipe_node(registry: _MCPRecipeRegistry) -> Callable:
                 "servings_multiplier": component.get("servings_multiplier", 1.0),
             }
             for component in existing.get("components", [])
+            if str(component["recipe_uuid"]) != str(recipe_uuid)
         ]
+        components = resolved_components or existing_components
         sources = [*existing.get("sources", []), *state["input_sources"]]
         payload = _build_recipe_payload(
             plan,

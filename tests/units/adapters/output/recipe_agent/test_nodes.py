@@ -365,6 +365,21 @@ async def test_create_components_reuses_existing_child_recipe():
     assert registry.created_recipes == []
 
 
+async def test_create_components_ignores_match_to_enrichment_target():
+    registry = FakeRegistryWithExistingRecipe()
+    node = make_create_components_node(registry, _always_match)
+    plan = _make_plan(components = [RecipeComponentPlan(name = "Sauce aux tomates cerises")])
+    state = _base_state(
+        plan = plan,
+        target_recipe_uuid = "existing-recipe",
+    )
+
+    result = await node(state)
+
+    assert result["resolved_components"] == []
+    assert registry.created_recipes == []
+
+
 # ── resolve_ustensils node ─────────────────────────────────────────────────────
 
 

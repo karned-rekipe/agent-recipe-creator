@@ -70,6 +70,10 @@ async def test_recipe_registry_call_and_public_wrappers(monkeypatch):
         "generate_recipe_image",
         "list_tags",
     ]
+    assert calls[6] == (
+        "generate_recipe_image",
+        {"uuid": "id", "replace_existing": False},
+    )
 
 
 async def test_recipe_registry_mcp_transport_result(monkeypatch):
