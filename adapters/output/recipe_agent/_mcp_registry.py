@@ -206,7 +206,7 @@ class _MCPRecipeRegistry:
     async def generate_recipe_image(self, uuid: str) -> dict:
         return await self._call(
             "generate_recipe_image",
-            {"uuid": uuid, "prompt": None, "replace_existing": False},
+            {"uuid": uuid, "replace_existing": False},
         )
 
     async def delete_recipe(self, uuid: str) -> None:

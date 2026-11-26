@@ -166,7 +166,9 @@ class RecipeAgentAdapter(RecipeAgentPort):
             raise KeyError(f"Recipe with uuid {recipe_uuid} not found")
         raw_text = (
             "Mets à niveau cette fiche existante. Préserve les données structurées correctes, complète les métadonnées "
-            "absentes et reclasse les ingrédients/étapes présents dans la description.\n\n"
+            "absentes et reclasse les ingrédients/étapes présents dans la description. "
+            "Ne place jamais la fiche cible elle-même dans components : seules des sous-recettes distinctes et "
+            "réutilisables peuvent devenir des composants.\n\n"
             f"FICHE EXISTANTE JSON:\n{json.dumps(existing, ensure_ascii=False)}"
         )
         initial_state: RecipeAgentState = {

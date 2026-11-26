@@ -84,5 +84,6 @@ async def test_enrich_loads_existing_recipe_and_updates_in_place():
     assert graph.state is not None
     assert graph.state["existing_recipe"]["name"] == "Soupe"
     assert "FICHE EXISTANTE JSON" in graph.state["messages"][0].content
+    assert "Ne place jamais la fiche cible elle-même dans components" in graph.state["messages"][0].content
     assert graph.state["progress_callback"] is report
     assert stages == ["loading_recipe"]

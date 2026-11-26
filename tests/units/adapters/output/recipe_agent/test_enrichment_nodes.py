@@ -135,6 +135,39 @@ async def test_update_recipe_omits_missing_uuid_from_existing_component():
     assert "uuid" not in component
 
 
+async def test_update_recipe_ignores_self_component_and_preserves_existing_components():
+    registry = _Registry()
+    state = _state(
+        resolved_components=[{
+            "recipe_uuid": "recipe-1",
+            "label": "Soupe",
+            "rank": 1,
+            "servings_multiplier": 1.0,
+        }],
+        existing_recipe={
+            **_state()["existing_recipe"],
+            "components": [{
+                "uuid": "component-link-1",
+                "recipe_uuid": "recipe-child",
+                "label": "Bouillon",
+                "rank": 1,
+                "servings_multiplier": 1.0,
+            }],
+        },
+    )
+
+    await make_update_recipe_node(registry)(state)
+
+    assert registry.updated is not None
+    assert registry.updated[1]["components"] == [{
+        "uuid": "component-link-1",
+        "recipe_uuid": "recipe-child",
+        "label": "Bouillon",
+        "rank": 1,
+        "servings_multiplier": 1.0,
+    }]
+
+
 async def test_generate_image_success_skip_and_warning():
     registry = _Registry()
     node = make_generate_image_node(registry)
